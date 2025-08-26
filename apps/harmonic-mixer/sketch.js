@@ -105,7 +105,10 @@ function updateMasterAutoScale(ms = RAMP_MS) {
 
 // ---------- Setup ----------
 window.setup = function () {
-  createCanvas(windowWidth, windowHeight);   // fill viewport
+  // Use the browser's inner dimensions to size the canvas. In some module
+  // contexts, p5's windowWidth/windowHeight globals can be undefined, which
+  // results in a zero-sized drawing surface and the spiral not appearing.
+  createCanvas(window.innerWidth, window.innerHeight);   // fill viewport
   pixelDensity(2);
   strokeCap(ROUND);
   textFont('system-ui, -apple-system, Segoe UI, Roboto, sans-serif');
@@ -121,19 +124,21 @@ window.setup = function () {
 };
 
 window.windowResized = function () {
-  resizeCanvas(windowWidth, windowHeight);
+  // Keep the canvas in sync with the viewport if it changes size.
+  resizeCanvas(window.innerWidth, window.innerHeight);
 };
 
 window.draw = function () {
   background(11);
 
   // Reserve the TOP HALF of the canvas for the spiral (controls sit in bottom half).
-  const topH = Math.max(0, Math.floor(height * 0.5));
-  const areaW = Math.max(0, width  - 2 * MARGIN);
+  // width/height globals are not available in ES module scope; use window.*
+  const topH = Math.max(0, Math.floor(window.height * 0.5));
+  const areaW = Math.max(0, window.width  - 2 * MARGIN);
   const areaH = Math.max(0, topH   - 2 * MARGIN);
 
   // Center point of the top region
-  const cx = Math.floor(width / 2);
+  const cx = Math.floor(window.width / 2);
   const cy = Math.floor(topH / 2);
 
   // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the top region
