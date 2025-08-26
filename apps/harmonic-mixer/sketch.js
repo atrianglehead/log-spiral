@@ -273,8 +273,9 @@ function buildAudio() {
   comp.attack.value = 0.003;
   comp.release.value = 0.25;
 
-  masterGain.connect(comp);
-  comp.connect(ctx.destination);
+  //masterGain.connect(comp);
+  //comp.connect(ctx.destination);
+  masterGain.connect(ctx.destination);
 
   for (let i = 0; i < PARTIALS; i++) {
     const osc = ctx.createOscillator(); osc.type = 'sine';
