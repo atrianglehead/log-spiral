@@ -1,3 +1,6 @@
+## Live Demo
+👉 [Open the Log Spiral App](https://atrianglehead.github.io/log-spiral/)
+
 # log-spiral
 Spec: Logarithmic Spiral Visualizer + Marker Sonification (v0.1)
 
