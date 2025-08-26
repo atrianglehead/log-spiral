@@ -26,4 +26,10 @@ label { color:#aaa; font-weight:600; margin-right: 6px; }
 .vslider { writing-mode: bt-lr; -webkit-appearance: slider-vertical; height: 120px; width: 18px; }
 .play-btn { font-size: 20px; padding: 6px 12px; border-radius: 8px; }
 .nowrap { display:flex; align-items:center; gap:8px; white-space:nowrap; flex-wrap:nowrap; }
-
+/* Subtle highlight while auditioning a slider */
+.vslider.auditioning {
+  outline: 2px solid #ffcc66;      /* warm highlight */
+  outline-offset: 2px;
+  background: #222;                /* slightly lighter track */
+  box-shadow: 0 0 6px 1px rgba(255, 204, 102, 0.4);
+}
