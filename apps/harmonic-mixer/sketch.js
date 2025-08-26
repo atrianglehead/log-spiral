@@ -7,7 +7,6 @@ const PARTIALS = 16;     // k = 1..16
 const DEFAULT_F0 = 110;  // Hz
 const DEFAULT_MASTER = 0.6;
 const X_BASE = 120;      // px for k=1
-const MARGIN = 32;
 
 // Headroom & normalization
 const PARTIAL_MAX      = 0.85; // per-partial cap for UI=100%
@@ -106,9 +105,8 @@ function updateMasterAutoScale(ms = RAMP_MS) {
 // ---------- Setup ----------
 window.setup = function () {
 
-  // Size the canvas to fill the viewport. p5's windowWidth/windowHeight reflect
-  // the browser's inner dimensions and stay in sync with resize events.
-  createCanvas(windowWidth, windowHeight);
+  // Canvas occupies the top half of the viewport.
+  createCanvas(windowWidth, windowHeight * 0.5);
 
   pixelDensity(2);
   strokeCap(ROUND);
@@ -125,28 +123,25 @@ window.setup = function () {
 };
 
 window.windowResized = function () {
-  // Keep the canvas in sync with the viewport if it changes size.
 
-  resizeCanvas(windowWidth, windowHeight);
+  // Keep the canvas occupying the top half on resize.
+  resizeCanvas(windowWidth, windowHeight * 0.5);
 
 };
 
 window.draw = function () {
   background(11);
 
-  // Reserve the TOP HALF of the canvas for the spiral (controls sit in bottom half).
-  // width/height globals are not available in ES module scope; use window.*
-  const topH = Math.max(0, Math.floor(window.height * 0.5));
-  const areaW = Math.max(0, window.width  - 2 * MARGIN);
-  const areaH = Math.max(0, topH   - 2 * MARGIN);
+  // Spiral bounds: square occupying 80% of the smaller canvas dimension.
+  const boundSide = 0.8 * Math.min(width, height);
+  const maxRadiusPixels = Math.max(0, boundSide / 2);
 
-  // Center point of the top region
-  const cx = Math.floor(window.width / 2);
-  const cy = Math.floor(topH / 2);
+  // Center of the canvas
+  const cx = Math.floor(width / 2);
+  const cy = Math.floor(height / 2);
 
-  // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the top region
-  // We fit radius to the smaller half-dimension minus a margin.
-  const maxRadiusPixels = Math.max(0, Math.min(areaW, areaH) / 2);
+
+  // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the bounds
   const finalUnscaledR  = X_BASE * PARTIALS; // outer radius before scaling
   const s = finalUnscaledR > 0 ? (maxRadiusPixels / finalUnscaledR) : 0;
 
@@ -168,8 +163,8 @@ window.draw = function () {
   if (s > 0) {
     // Axes
     stroke(50); strokeWeight(1);
-    line(-areaW/2, 0, areaW/2, 0);
-    line(0, -areaH/2, 0, areaH/2);
+    line(-boundSide/2, 0, boundSide/2, 0);
+    line(0, -boundSide/2, 0, boundSide/2);
 
     // Partials
     for (let i = 0; i < PARTIALS; i++) {

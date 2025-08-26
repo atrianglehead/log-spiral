@@ -22,18 +22,19 @@ body{
 canvas{
   display:block;
   width: 100vw;
-  height: 100vh;
+  height: 50vh; /* top half */
   max-width: 100vw;
-  max-height: 100vh;
+  max-height: 50vh;
 }
 
 /* Controls panel fixed to bottom half */
+
 .ui{
   position:absolute;
-  inset: auto 12px 12px 12px;   /* bottom, full width minus margins */
-  height: 50vh;
-  max-height: 50vh;
-  width: calc(100vw - 24px);
+  top:50vh;
+  left:0;
+  width:100vw;
+  height:50vh;
 
   display:flex;
   flex-direction: column;
