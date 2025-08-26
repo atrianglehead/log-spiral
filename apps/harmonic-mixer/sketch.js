@@ -80,13 +80,27 @@ const masterSlider01 = () =>
   Math.min(MASTER_MAX, (parseInt(masterSlider?.value() ?? Math.round(DEFAULT_MASTER * 100), 10) / 100));
 
 function computeAutoScale() {
-  // Equal-power: S = min(1, PARTIAL_MAX / sqrt(sum(g^2)))
-  let E = 0;
-  for (let i = 0; i < gains.length; i++) E += gains[i] * gains[i];
-  const rms = Math.sqrt(E);
-  if (rms <= Math.max(PARTIAL_MAX, NORM_EPS)) return 1;
-  return Math.min(1, PARTIAL_MAX / rms);
+  // Equal-power (RMS) + peak-safe bound
+  let sum = 0;
+  let sumsq = 0;
+  for (let i = 0; i < gains.length; i++) {
+    const g = gains[i];
+    sum   += g;
+    sumsq += g * g;
+  }
+
+  // RMS-based scaling (perceived loudness control)
+  const rms = Math.sqrt(sumsq);
+  const S_rms  = rms <= NORM_EPS ? 1 : Math.min(1, PARTIAL_MAX / rms);
+
+  // Peak-safe scaling (guarantee no digital clipping even if all sliders = 1)
+  const PEAK_GAMMA = 0.95; // leaves a little true-peak headroom
+  const S_peak = sum <= NORM_EPS ? 1 : Math.min(1, PEAK_GAMMA / sum);
+
+  // Use the stricter of the two
+  return Math.min(S_rms, S_peak);
 }
+
 
 function masterEffective() {
   return masterSlider01() * computeAutoScale();
