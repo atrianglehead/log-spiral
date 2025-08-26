@@ -34,8 +34,8 @@ let tempo = DEFAULT_TEMPO;
 let seqIndex = 0;
 let seqNextTime = 0;
 
-const auditioning = Array(PARTIALS).fill(false); // slider is being held
-const replacing   = Array(PARTIALS).fill(false); // in Mix+playing: route closed, monitor owns sound
+const auditioning = Array(PARTIALS).fill(false); 
+const replacing   = Array(PARTIALS).fill(false); 
 
 // p5 + UI
 let ui, groupGlobal, groupGrid, playGroup;
@@ -46,22 +46,20 @@ let colHzLabels = [];
 // ---------- Audio graph ----------
 let ctx = null;
 let masterGain = null;
-let comp = null; // gentle safety compressor
-// per partial: osc -> mixGain -> routeGain -> master
-// plus parallel monitor (audition) gain: osc -> monitorGain -> master
+let comp = null; 
 const oscs = [];
 const mixGains = [];
 const routeGains = [];
 const monitorGains = [];
 
-// ------------ Equal-power helpers (cosine curves) ------------
+// ------------ Equal-power helpers ------------
 function applyCurve(param, from, to, ms, at = audioNow()) {
   const dur = Math.max(0.0005, ms / 1000);
   const N = 128;
   const curve = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    const t = i / (N - 1);                       // 0..1
-    const y = 0.5 - 0.5 * Math.cos(Math.PI * t); // cosine ease-in-out
+    const t = i / (N - 1);                       
+    const y = 0.5 - 0.5 * Math.cos(Math.PI * t); 
     curve[i] = from + (to - from) * y;
   }
   param.cancelScheduledValues(at);
@@ -80,7 +78,6 @@ const masterSlider01 = () =>
   Math.min(MASTER_MAX, (parseInt(masterSlider?.value() ?? Math.round(DEFAULT_MASTER * 100), 10) / 100));
 
 function computeAutoScale() {
-  // Equal-power (RMS) + peak-safe bound
   let sum = 0;
   let sumsq = 0;
   for (let i = 0; i < gains.length; i++) {
@@ -88,19 +85,12 @@ function computeAutoScale() {
     sum   += g;
     sumsq += g * g;
   }
-
-  // RMS-based scaling (perceived loudness control)
   const rms = Math.sqrt(sumsq);
   const S_rms  = rms <= NORM_EPS ? 1 : Math.min(1, PARTIAL_MAX / rms);
-
-  // Peak-safe scaling (guarantee no digital clipping even if all sliders = 1)
-  const PEAK_GAMMA = 0.95; // leaves a little true-peak headroom
+  const PEAK_GAMMA = 0.95;
   const S_peak = sum <= NORM_EPS ? 1 : Math.min(1, PEAK_GAMMA / sum);
-
-  // Use the stricter of the two
   return Math.min(S_rms, S_peak);
 }
-
 
 function masterEffective() {
   return masterSlider01() * computeAutoScale();
@@ -126,7 +116,6 @@ window.setup = function () {
   updateRouteForMode();
   refreshPlayButton();
 
-  // ensure master starts at 0 to avoid resume pops
   if (masterGain) setNow(masterGain.gain, 0);
 };
 
@@ -141,12 +130,8 @@ window.draw = function () {
   translate(area.cx, area.cy);
 
   if (showCurve) drawSpiralCurve(s);
-
-  // axes
   stroke(50); strokeWeight(1);
   line(-area.w/2, 0, area.w/2, 0); line(0, -area.h/2, 0, area.h/2);
-
-  // partials
   drawPartials(s);
 
   pop();
@@ -157,7 +142,6 @@ window.draw = function () {
 // ---------- UI ----------
 function buildUI() {
   ui = createDiv().addClass('ui');
-  window.addEventListener('resize', positionUI);
 
   // Global
   groupGlobal = createDiv().addClass('group');
@@ -179,14 +163,13 @@ function buildUI() {
   groupGlobal.child(masterSlider); groupGlobal.child(mVal);
   masterSlider.elt.addEventListener('input', () => {
     ensureAudio();
-    // Only adjust audible master when playing or auditioning; otherwise keep at 0
     updateMasterAutoScale(RAMP_MS);
     mVal.html(' ' + Math.round(masterSlider01() * 100) + '%');
   });
 
   groupGlobal.child(makeLabel('Spiral curve:'));
-  curveCheckbox = createCheckbox();        // no label
-  curveCheckbox.parent(groupGlobal);       // re-parent into the panel
+  curveCheckbox = createCheckbox();
+  curveCheckbox.parent(groupGlobal);
   curveCheckbox.checked(showCurve);
   curveCheckbox.changed(() => { showCurve = curveCheckbox.checked(); });
 
@@ -235,7 +218,6 @@ function buildUI() {
     colSliders[i] = v;
     colHzLabels[i] = hz;
 
-    // audition-enabled slider with cosine ramps
     v.elt.addEventListener('pointerdown', (e) => {
       v.elt.setPointerCapture(e.pointerId);
       startAudition(i);
@@ -251,7 +233,6 @@ function buildUI() {
     v.elt.addEventListener('lostpointercapture', () => stopAudition(i));
   }
 
-  // Play handler with master fade
   playBtn.mousePressed(() => {
     ensureAudio();
     if (mode === 'seq') {
@@ -264,25 +245,16 @@ function buildUI() {
   ui.child(groupGlobal);
   ui.child(groupGrid);
   ui.child(playGroup);
-  positionUI();
 
-  // init readouts
   f0Slider.elt.dispatchEvent(new Event('input'));
   masterSlider.elt.dispatchEvent(new Event('input'));
   tempoSlider.elt.dispatchEvent(new Event('input'));
 
-  // Resume audio politely when tab returns
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       try { ensureAudio(); setNow(masterGain.gain, (playing || anyAuditioning()) ? masterEffective() : 0); } catch {}
     }
   });
-}
-
-function positionUI() {
-  const cnv = document.querySelector('canvas'); const r = cnv.getBoundingClientRect(); const pad = 12;
-  ui.position(r.left + window.scrollX + pad, r.top + window.scrollY + pad);
-  ui.style('max-width', `${r.width - 2 * pad}px`);
 }
 
 const makeLabel = (txt) => { const s = createSpan(txt); s.style('color', '#aaa'); s.style('font-weight', 'bold'); return s; };
