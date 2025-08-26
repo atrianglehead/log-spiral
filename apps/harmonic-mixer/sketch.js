@@ -105,7 +105,9 @@ function updateMasterAutoScale(ms = RAMP_MS) {
 
 // ---------- Setup ----------
 window.setup = function () {
-  createCanvas(windowWidth, windowHeight);   // fill viewport
+  // Size the canvas to fill the viewport. p5's windowWidth/windowHeight reflect
+  // the browser's inner dimensions and stay in sync with resize events.
+  createCanvas(windowWidth, windowHeight);
   pixelDensity(2);
   strokeCap(ROUND);
   textFont('system-ui, -apple-system, Segoe UI, Roboto, sans-serif');
@@ -121,6 +123,7 @@ window.setup = function () {
 };
 
 window.windowResized = function () {
+  // Keep the canvas in sync with the viewport if it changes size.
   resizeCanvas(windowWidth, windowHeight);
 };
 
@@ -172,13 +175,13 @@ window.draw = function () {
       const py = r * Math.sin(th);
 
       const g = gains[i];
-      const alpha = g / 0.85; // PARTIAL_MAX
-      const col = window.color(220, 210, 140, 255 * alpha);
-      
-      stroke(window.red(col), window.green(col), window.blue(col), alpha * 255); strokeWeight(2);
+      const alpha = g / PARTIAL_MAX;
+      const col = color(220, 210, 140, 255 * alpha);
+
+      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
       line(0, 0, px, py);
 
-      noStroke(); fill(window.red(col), window.green(col), window.blue(col), alpha * 255);
+      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
       circle(px, py, 8);
 
       fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
