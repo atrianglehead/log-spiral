@@ -24,6 +24,9 @@ let seqIndex = 0;        // 0..PARTIALS-1 for sequence mode
 let seqNextTime = 0;     // AudioContext time for next step
 let wasPlayingBeforeAudition = false;
 
+// track slider audition state
+const auditioning = Array(PARTIALS).fill(false);
+
 // p5 + UI
 let ui, groupGlobal, groupGrid, playGroup;
 let f0Slider, masterSlider, curveCheckbox, modeSelect, tempoSlider, tempoRow, playBtn;
@@ -50,9 +53,8 @@ window.setup = function () {
   buildUI();
   buildAudio();
 
-  updateGlobalUI();
   updateGridUI();
-  updateRouteForMode();   // ensure routers match default 'mix'
+  updateRouteForMode();
   refreshPlayButton();
 };
 
@@ -60,25 +62,23 @@ window.draw = function () {
   background(11);
 
   const area = getSafeArea(document.querySelector('canvas'), ui.elt, { w: width, h: height, gap: 12, margin: MARGIN });
-  const finalR_unscaled = X_BASE * PARTIALS; // since r_k = k*x, k max = 16
+  const finalR_unscaled = X_BASE * PARTIALS;
   const s = fitScale(finalR_unscaled, area, MARGIN);
 
   push();
   translate(area.cx, area.cy);
 
-  // Optional spiral curve (from θ=0..θ_16)
   if (showCurve) drawSpiralCurve(s);
 
-  // Radial axes (faint)
+  // axes
   stroke(50); strokeWeight(1);
   line(-area.w/2, 0, area.w/2, 0); line(0, -area.h/2, 0, area.h/2);
 
-  // Draw points + radial lines for k=1..16, opacity follows gain
+  // points + lines
   drawPartials(s);
 
   pop();
 
-  // Sequence scheduling
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
 
@@ -134,7 +134,7 @@ function buildUI() {
     if (mode === 'seq') resetSequenceClock();
   });
 
-  // tempo (only for sequence)
+  // tempo
   tempoRow = createDiv().addClass('nowrap');
   tempoRow.child(makeLabel('Tempo:'));
   tempoSlider = createSlider(1, 12, DEFAULT_TEMPO, 1); tempoSlider.addClass('slider');
@@ -148,7 +148,7 @@ function buildUI() {
     if (mode === 'seq') resetSequenceClock();
   });
 
-  // Play group (separate)
+  // Play group
   playGroup = createDiv().addClass('group');
   playBtn = createButton('▶'); playBtn.addClass('play-btn'); playBtn.attribute('title', 'Play/Pause');
   playGroup.child(playBtn);
@@ -167,11 +167,18 @@ function buildUI() {
     colSliders[i] = v;
     colHzLabels[i] = hz;
 
-    // --- Slider audition: play while held (even if paused or in other mode) ---
-    v.elt.addEventListener('pointerdown', () => startAudition(i));
+    // audition-enabled slider
+    v.elt.addEventListener('pointerdown', (e) => {
+      v.elt.setPointerCapture(e.pointerId);
+      startAudition(i);
+      updatePartialFromSlider(i);
+    });
     v.elt.addEventListener('pointermove', () => updatePartialFromSlider(i));
-    v.elt.addEventListener('input',       () => updatePartialFromSlider(i)); // for keyboard/mousewheel
-    v.elt.addEventListener('pointerup',   () => stopAudition(i));
+    v.elt.addEventListener('input', () => updatePartialFromSlider(i));
+    v.elt.addEventListener('pointerup', (e) => {
+      try { v.elt.releasePointerCapture(e.pointerId); } catch (_) {}
+      stopAudition(i);
+    });
     v.elt.addEventListener('pointercancel', () => stopAudition(i));
     v.elt.addEventListener('lostpointercapture', () => stopAudition(i));
   }
@@ -183,7 +190,6 @@ function buildUI() {
       if (!playing) startSequence();
       else pauseAll();
     } else {
-      // mix mode
       if (!playing) startMix();
       else pauseAll();
     }
@@ -208,10 +214,6 @@ function positionUI() {
 
 const makeLabel = (txt) => { const s = createSpan(txt); s.style('color', '#aaa'); s.style('font-weight', 'bold'); return s; };
 
-function updateGlobalUI() {
-  // just ensures initial text values are set
-}
-
 function updateGridUI() {
   for (let i = 0; i < PARTIALS; i++) {
     const k = i + 1;
@@ -232,16 +234,15 @@ function buildAudio() {
 
   for (let i = 0; i < PARTIALS; i++) {
     const osc = ctx.createOscillator(); osc.type = 'sine';
-    const mixG = ctx.createGain();      mixG.gain.value = gains[i];     // slider gain
-    const routeG = ctx.createGain();    routeG.gain.value = 0;          // router (0/1)
-    const monG = ctx.createGain();      monG.gain.value = 0;            // audition path
+    const mixG = ctx.createGain();      mixG.gain.value = gains[i];
+    const routeG = ctx.createGain();    routeG.gain.value = 0;
+    const monG = ctx.createGain();      monG.gain.value = 0;
 
     osc.connect(mixG); mixG.connect(routeG); routeG.connect(masterGain);
     osc.connect(monG); monG.connect(masterGain);
 
     oscs[i] = osc; mixGains[i] = mixG; routeGains[i] = routeG; monitorGains[i] = monG;
 
-    // initial frequency
     osc.frequency.value = (i + 1) * f0;
     osc.start();
   }
@@ -260,37 +261,34 @@ function updatePartialFromSlider(i) {
   ensureAudio();
   const v = parseInt(colSliders[i].value(), 10) / 100;
   gains[i] = v;
-  ramp(mixGains[i].gain, v, audioNow(), RAMP_MS);
+  const t = audioNow();
+  ramp(mixGains[i].gain, v, t, RAMP_MS);
+
+  // mirror to monitor path if auditioning
+  if (auditioning[i]) {
+    ramp(monitorGains[i].gain, v, t, 10);
+  }
 }
 
 function startAudition(i) {
   ensureAudio();
   wasPlayingBeforeAudition = playing;
-  // open monitor gain for this partial; keep following slider value
+  auditioning[i] = true;
   const v = parseInt(colSliders[i].value(), 10) / 100;
   ramp(monitorGains[i].gain, v, audioNow(), 5);
-  // while held, pointermove/input keeps calling updatePartialFromSlider (mix gain), and we mirror to monitor too:
-  colSliders[i].addClass('auditioning');
-  colSliders[i].setAttribute('data-aud', '1');
 }
 
 function stopAudition(i) {
-  // close monitor gain quickly
+  if (!auditioning[i]) return;
+  auditioning[i] = false;
   ramp(monitorGains[i].gain, 0, audioNow(), 30);
-  colSliders[i].removeClass('auditioning');
-  colSliders[i].removeAttribute('data-aud');
-  if (!wasPlayingBeforeAudition && mode === 'mix' && !playing) {
-    // remained paused overall; nothing else to do
-  }
 }
 
 function updateRouteForMode() {
   const t = audioNow();
   if (mode === 'mix') {
-    // routers follow play/pause (1 when playing, else 0)
     for (let i = 0; i < PARTIALS; i++) ramp(routeGains[i].gain, playing ? 1 : 0, t, RAMP_MS);
   } else {
-    // sequence: only current index open when playing; else all 0
     for (let i = 0; i < PARTIALS; i++) ramp(routeGains[i].gain, (playing && i === seqIndex) ? 1 : 0, t, RAMP_MS);
   }
 }
@@ -304,7 +302,6 @@ function startMix() {
 function startSequence() {
   playing = true;
   resetSequenceClock();
-  // open current step, close others
   const t = audioNow();
   for (let i = 0; i < PARTIALS; i++) {
     const target = (i === seqIndex) ? 1 : 0;
@@ -320,23 +317,19 @@ function resetSequenceClock() {
 
 function stepSequenceIfDue() {
   const now = audioNow();
-  if (now + 0.005 < seqNextTime) return; // small lookahead window
+  if (now + 0.005 < seqNextTime) return;
 
-  // advance to next partial (if any)
   const prev = seqIndex;
   seqIndex++;
 
   if (seqIndex >= PARTIALS) {
-    // finished the sweep
     playing = false;
-    // close routers
     const t = audioNow();
     for (let i = 0; i < PARTIALS; i++) ramp(routeGains[i].gain, 0, t, SEQ_XFADE_MS);
     refreshPlayButton();
     return;
   }
 
-  // crossfade prev -> next
   const t = Math.max(now, seqNextTime);
   ramp(routeGains[prev].gain, 0, t, SEQ_XFADE_MS);
   ramp(routeGains[seqIndex].gain, 1, t, SEQ_XFADE_MS);
@@ -353,15 +346,12 @@ function pauseAll() {
 
 // ---------- Drawing ----------
 function drawSpiralCurve(s) {
-  // draw from θ=0 to θ corresponding to k=16 → θ_16 = 2π log2 16 = 8π (4 turns)
   const thetaMax = TAU * log2(PARTIALS);
   noFill(); stroke(70); strokeWeight(2);
   beginShape();
   for (let th = 0; th <= thetaMax; th += 0.02) {
     const r = X_BASE * Math.pow(2, th / TAU) * s;
-    const x = r * Math.cos(th);
-    const y = r * Math.sin(th);
-    vertex(x, y);
+    vertex(r * Math.cos(th), r * Math.sin(th));
   }
   endShape();
 }
@@ -374,22 +364,18 @@ function drawPartials(s) {
     const px = r * Math.cos(th);
     const py = r * Math.sin(th);
 
-    const g = gains[i]; // 0..1
-    const alpha = Math.min(1, Math.max(0.08, g)); // small floor so 0% is still faintly visible? if you want invisible, remove max(0.08,...)
+    const g = gains[i];
+    const alpha = g; 
     const col = color(220, 210, 140, 255 * alpha);
 
-    // radial line
     stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
     line(0, 0, px, py);
 
-    // point
     noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
     circle(px, py, 8);
 
-    // label
     fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
     const off = 16;
     text(`${k}`, px + off * Math.cos(th), py + off * Math.sin(th));
   }
 }
-
