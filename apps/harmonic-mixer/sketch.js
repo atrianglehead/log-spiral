@@ -132,12 +132,13 @@ window.draw = function () {
   background(11);
 
   // Reserve the TOP HALF of the canvas for the spiral (controls sit in bottom half).
-  const topH = Math.max(0, Math.floor(height * 0.5));
-  const areaW = Math.max(0, width  - 2 * MARGIN);
+  // width/height globals are not available in ES module scope; use window.*
+  const topH = Math.max(0, Math.floor(window.height * 0.5));
+  const areaW = Math.max(0, window.width  - 2 * MARGIN);
   const areaH = Math.max(0, topH   - 2 * MARGIN);
 
   // Center point of the top region
-  const cx = Math.floor(width / 2);
+  const cx = Math.floor(window.width / 2);
   const cy = Math.floor(topH / 2);
 
   // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the top region
