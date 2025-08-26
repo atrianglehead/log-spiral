@@ -197,6 +197,17 @@ window.draw = function () {
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
 
+function refreshPlayButton() {
+  if (!playBtn) return;
+  playBtn.html(playing ? '❚❚' : '▶');
+}
+
+function updateGridUI() {
+  for (let i = 0; i < PARTIALS; i++) {
+    const hz = Math.round((i + 1) * f0);
+    colHzLabels[i]?.html(' ' + hz + ' Hz');
+  }
+}
 
 // ---------- UI ----------
 function buildUI() {
