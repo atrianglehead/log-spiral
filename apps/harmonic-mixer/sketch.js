@@ -105,7 +105,10 @@ function updateMasterAutoScale(ms = RAMP_MS) {
 
 // ---------- Setup ----------
 window.setup = function () {
-  createCanvas(windowWidth, windowHeight);   // fill viewport
+  // Use the browser's inner dimensions to size the canvas. In some module
+  // contexts, p5's windowWidth/windowHeight globals can be undefined, which
+  // results in a zero-sized drawing surface and the spiral not appearing.
+  createCanvas(window.innerWidth, window.innerHeight);   // fill viewport
   pixelDensity(2);
   strokeCap(ROUND);
   textFont('system-ui, -apple-system, Segoe UI, Roboto, sans-serif');
@@ -121,7 +124,8 @@ window.setup = function () {
 };
 
 window.windowResized = function () {
-  resizeCanvas(windowWidth, windowHeight);
+  // Keep the canvas in sync with the viewport if it changes size.
+  resizeCanvas(window.innerWidth, window.innerHeight);
 };
 
 window.draw = function () {
