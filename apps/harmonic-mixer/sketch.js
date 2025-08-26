@@ -122,26 +122,16 @@ window.setup = function () {
 window.draw = function () {
   background(11);
 
-  // Reserve the top region of the canvas for the spiral, above the bottom-docked UI panel.
-  // We measure the panel height from the DOM and subtract it from the canvas height.
-  const panelRect = ui?.elt?.getBoundingClientRect?.() || { height: 0, top: 0 };
-  const canvasRect = document.querySelector('canvas').getBoundingClientRect();
-
-  // Panel height that overlaps our canvas (guard if panel extends beyond canvas)
-  const overlapH = Math.max(
-    0,
-    Math.min(canvasRect.bottom, panelRect.top + panelRect.height) - Math.max(canvasRect.top, panelRect.top)
-  );
-
-  const topH = Math.max(0, height - overlapH - MARGIN); // leave a little margin
+  // Use the TOP HALF of the canvas for the spiral (controls occupy bottom 50vh)
+  const topH = Math.max(0, Math.floor(height * 0.5));
   const area = {
     w: width - 2 * MARGIN,
-    h: Math.max(0, topH - MARGIN),
-    cx: width / 2,
-    cy: Math.max(0, (topH) / 2),
+    h: Math.max(0, topH - 2 * MARGIN),
+    cx: Math.floor(width / 2),
+    cy: Math.floor(topH / 2),
   };
 
-  // scale to fit the intended final radius inside the available top area
+  // Scale the spiral to fit in the top half
   const finalR_unscaled = X_BASE * PARTIALS;
   const s = fitScale(finalR_unscaled, area, MARGIN);
 
@@ -162,6 +152,7 @@ window.draw = function () {
 
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
+
 
 
 // ---------- UI ----------
