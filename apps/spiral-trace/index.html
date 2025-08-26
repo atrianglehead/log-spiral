@@ -1,18 +1,17 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Log Spiral — Visual + Audio</title>
+  <title>Spiral Tracer — Log Harmonics</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Styles for the floating UI panel and controls -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main>
     <!-- p5 core -->
     <script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
-    <!-- your sketch with Play/Pause and panel-aware layout -->
-    <script src="sketch.js"></script>
+    <!-- ES module sketch so we can import from /lib -->
+    <script type="module" src="sketch.js"></script>
   </main>
 </body>
 </html>
