@@ -1,11 +1,10 @@
-/* ====== Base ====== */
 :root{
   --bg:#0b0b0c;
-  --panel:#141417cc;        /* translucent panel */
+  --panel:#141417cc;
   --panel-border:#2a2a2e;
   --text:#e6e6ea;
   --muted:#a9a9b3;
-  --accent:#ffd166;         /* warm accent */
+  --accent:#ffd166;
   --shadow:0 6px 22px rgba(0,0,0,.45);
   --radius:12px;
   --gap:10px;
@@ -19,20 +18,25 @@ body{
   font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;
 }
 
-/* ====== Canvas ====== */
-canvas{ display:block; }
+/* Canvas fills viewport; prevents horizontal overflow */
+canvas{
+  display:block;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+}
 
-/* ====== Controls panel (fixed to bottom, exactly half screen) ====== */
+/* Controls panel fixed to bottom half */
 .ui{
   position:absolute;
-  inset: auto 12px 12px 12px;     /* bottom-left corner */
-  height: 50vh;                   /* exact half viewport height */
+  inset: auto 12px 12px 12px;   /* bottom, full width minus margins */
+  height: 50vh;
   max-height: 50vh;
   width: calc(100vw - 24px);
-  max-width: calc(100vw - 24px);
 
   display:flex;
-  flex-direction: column;         /* stack groups vertically */
+  flex-direction: column;
   align-items: stretch;
   gap: var(--gap);
 
@@ -44,11 +48,11 @@ canvas{ display:block; }
   backdrop-filter: blur(6px);
   z-index: 10;
 
-  overflow-y: auto;               /* scroll within panel if needed */
+  overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* ====== Groups (compact) ====== */
+/* Groups */
 .group{
   display:flex;
   align-items:center;
@@ -71,11 +75,10 @@ canvas{ display:block; }
 }
 .nowrap{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
 
-/* ====== Labels & readouts ====== */
 .group span{ user-select:none; }
 .group .label{ font-weight:600; color: var(--muted); margin-right: 4px; }
 
-/* ====== Horizontal sliders / selects / play ====== */
+/* Horizontal sliders */
 .slider{
   appearance: none;
   width: 140px;
@@ -99,6 +102,7 @@ canvas{ display:block; }
 }
 select, .play-btn { font: inherit; }
 
+/* Play button */
 .play-btn{
   width: 40px; height:40px;
   border-radius: 10px;
@@ -113,7 +117,7 @@ select, .play-btn { font: inherit; }
 .play-btn:hover{ background:#1f1f25; }
 .play-btn:active{ transform: translateY(1px); }
 
-/* ====== Harmonic grid (tighter) ====== */
+/* Harmonic grid (compact) */
 .hgrid{
   display:grid;
   grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
@@ -132,17 +136,15 @@ select, .play-btn { font: inherit; }
   min-width:52px;
 }
 .hcol:hover{ border-color:#2b2b33; }
-.hcol > span:first-child{     /* “k=1” label */
-  font-size:11px; color:var(--muted);
-}
+.hcol > span:first-child{ font-size:11px; color:var(--muted); }
 
-/* Vertical partial sliders — shorter & narrower */
+/* Vertical partial sliders — 0.75× previous height (16vh → 12vh) */
 .vslider{
-  writing-mode: bt-lr;        /* vertical */
+  writing-mode: bt-lr;
   -webkit-appearance: slider-vertical;
   appearance: slider-vertical;
-  width: 22px;                 /* slimmer */
-  height: 16vh;                /* ≈ one-third of the controls pane height */
+  width: 22px;
+  height: 12vh; /* reduced from 16vh */
   background: linear-gradient(#2a2a31, #2a2a31) no-repeat center/5px 100%;
   border-radius: 10px;
   outline:none;
@@ -175,18 +177,18 @@ select, .play-btn { font: inherit; }
   opacity:.9;
 }
 
-/* ====== Small screens ====== */
+/* Small screens */
 @media (max-width: 960px){
   .slider{ width:130px; }
-  .vslider{ height: 15vh; width: 20px; }
+  .vslider{ height: 11vh; width: 20px; }
 }
 @media (max-width: 640px){
   body{ font-size:13px; }
   .slider{ width:120px; }
-  .vslider{ height: 14vh; width: 20px; }
+  .vslider{ height: 10vh; width: 20px; }
   .title{ font-size:10px; }
 }
 @media (max-width: 380px){
   .slider{ width:110px; }
-  .vslider{ height: 13vh; width: 18px; }
+  .vslider{ height: 9vh; width: 18px; }
 }
