@@ -104,8 +104,10 @@ function updateMasterAutoScale(ms = RAMP_MS) {
 
 // ---------- Setup ----------
 window.setup = function () {
+
   // Canvas occupies the top half of the viewport.
   createCanvas(windowWidth, windowHeight * 0.5);
+
   pixelDensity(2);
   strokeCap(ROUND);
   textFont('system-ui, -apple-system, Segoe UI, Roboto, sans-serif');
@@ -121,8 +123,10 @@ window.setup = function () {
 };
 
 window.windowResized = function () {
+
   // Keep the canvas occupying the top half on resize.
   resizeCanvas(windowWidth, windowHeight * 0.5);
+
 };
 
 window.draw = function () {
@@ -135,6 +139,7 @@ window.draw = function () {
   // Center of the canvas
   const cx = Math.floor(width / 2);
   const cy = Math.floor(height / 2);
+
 
   // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the bounds
   const finalUnscaledR  = X_BASE * PARTIALS; // outer radius before scaling
@@ -190,6 +195,17 @@ window.draw = function () {
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
 
+function refreshPlayButton() {
+  if (!playBtn) return;
+  playBtn.html(playing ? '❚❚' : '▶');
+}
+
+function updateGridUI() {
+  for (let i = 0; i < PARTIALS; i++) {
+    const hz = Math.round((i + 1) * f0);
+    colHzLabels[i]?.html(' ' + hz + ' Hz');
+  }
+}
 
 // ---------- UI ----------
 function buildUI() {
