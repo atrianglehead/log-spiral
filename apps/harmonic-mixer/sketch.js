@@ -1,5 +1,5 @@
 import { TAU, log2, thetaForMultiple } from '../../lib/spiralMath.js';
-import { getSafeArea, fitScale }       from '../../lib/panelFit.js';
+import { fitScale }       from '../../lib/panelFit.js';
 import { ensureAudio, makeMaster, audioNow } from '../../lib/audioCore.js';
 
 // ---------- Configuration ----------
@@ -26,7 +26,7 @@ const DEFAULT_TEMPO  = 4;    // steps/sec (sequence)
 
 // ---------- State ----------
 let f0 = DEFAULT_F0;
-let gains = Array(PARTIALS).fill(0); gains[0] = 1 * PARTIAL_MAX; // default: fundamental up to cap
+let gains = Array(PARTIALS).fill(0); gains[0] = 1 * PARTIAL_MAX;
 let showCurve = true;
 let mode = 'mix'; // 'mix' | 'seq'
 let playing = false;
@@ -34,8 +34,8 @@ let tempo = DEFAULT_TEMPO;
 let seqIndex = 0;
 let seqNextTime = 0;
 
-const auditioning = Array(PARTIALS).fill(false); 
-const replacing   = Array(PARTIALS).fill(false); 
+const auditioning = Array(PARTIALS).fill(false);
+const replacing   = Array(PARTIALS).fill(false);
 
 // p5 + UI
 let ui, groupGlobal, groupGrid, playGroup;
@@ -46,7 +46,7 @@ let colHzLabels = [];
 // ---------- Audio graph ----------
 let ctx = null;
 let masterGain = null;
-let comp = null; 
+let comp = null; // safety compressor
 const oscs = [];
 const mixGains = [];
 const routeGains = [];
@@ -58,8 +58,8 @@ function applyCurve(param, from, to, ms, at = audioNow()) {
   const N = 128;
   const curve = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    const t = i / (N - 1);                       
-    const y = 0.5 - 0.5 * Math.cos(Math.PI * t); 
+    const t = i / (N - 1);
+    const y = 0.5 - 0.5 * Math.cos(Math.PI * t);
     curve[i] = from + (to - from) * y;
   }
   param.cancelScheduledValues(at);
@@ -77,6 +77,7 @@ const uiToPartialGain = (ui01) => ui01 * PARTIAL_MAX;
 const masterSlider01 = () =>
   Math.min(MASTER_MAX, (parseInt(masterSlider?.value() ?? Math.round(DEFAULT_MASTER * 100), 10) / 100));
 
+// Hybrid RMS + peak-safe normalization
 function computeAutoScale() {
   let sum = 0;
   let sumsq = 0;
@@ -87,7 +88,7 @@ function computeAutoScale() {
   }
   const rms = Math.sqrt(sumsq);
   const S_rms  = rms <= NORM_EPS ? 1 : Math.min(1, PARTIAL_MAX / rms);
-  const PEAK_GAMMA = 0.95;
+  const PEAK_GAMMA = 0.95; // a little true-peak headroom
   const S_peak = sum <= NORM_EPS ? 1 : Math.min(1, PEAK_GAMMA / sum);
   return Math.min(S_rms, S_peak);
 }
@@ -104,7 +105,7 @@ function updateMasterAutoScale(ms = RAMP_MS) {
 
 // ---------- Setup ----------
 window.setup = function () {
-  createCanvas(900, 720);
+  createCanvas(windowWidth, windowHeight);   // fill viewport
   pixelDensity(2);
   strokeCap(ROUND);
   textFont('system-ui, -apple-system, Segoe UI, Roboto, sans-serif');
@@ -119,10 +120,14 @@ window.setup = function () {
   if (masterGain) setNow(masterGain.gain, 0);
 };
 
+window.windowResized = function () {
+  resizeCanvas(windowWidth, windowHeight);
+};
+
 window.draw = function () {
   background(11);
 
-  // Use the TOP HALF of the canvas for the spiral (controls occupy bottom 50vh)
+  // Always render in the TOP HALF; controls occupy bottom half
   const topH = Math.max(0, Math.floor(height * 0.5));
   const area = {
     w: width - 2 * MARGIN,
@@ -131,7 +136,7 @@ window.draw = function () {
     cy: Math.floor(topH / 2),
   };
 
-  // Scale the spiral to fit in the top half
+  // Scale to fit the intended final radius inside the available top area
   const finalR_unscaled = X_BASE * PARTIALS;
   const s = fitScale(finalR_unscaled, area, MARGIN);
 
@@ -153,11 +158,14 @@ window.draw = function () {
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
 
-
-
 // ---------- UI ----------
 function buildUI() {
   ui = createDiv().addClass('ui');
+
+  // Play group (now first)
+  playGroup = createDiv().addClass('group');
+  playBtn = createButton('▶'); playBtn.addClass('play-btn'); playBtn.attribute('title', 'Play/Pause');
+  playGroup.child(playBtn);
 
   // Global
   groupGlobal = createDiv().addClass('group');
@@ -215,11 +223,6 @@ function buildUI() {
     if (mode === 'seq') resetSequenceClock();
   });
 
-  // Play group
-  playGroup = createDiv().addClass('group');
-  playBtn = createButton('▶'); playBtn.addClass('play-btn'); playBtn.attribute('title', 'Play/Pause');
-  playGroup.child(playBtn);
-
   // Grid
   groupGrid = createDiv().addClass('group').style('width', '100%');
   const grid = createDiv().addClass('hgrid'); groupGrid.child(grid);
@@ -234,6 +237,7 @@ function buildUI() {
     colSliders[i] = v;
     colHzLabels[i] = hz;
 
+    // audition-enabled slider
     v.elt.addEventListener('pointerdown', (e) => {
       v.elt.setPointerCapture(e.pointerId);
       startAudition(i);
@@ -249,6 +253,7 @@ function buildUI() {
     v.elt.addEventListener('lostpointercapture', () => stopAudition(i));
   }
 
+  // Play handler
   playBtn.mousePressed(() => {
     ensureAudio();
     if (mode === 'seq') {
@@ -258,14 +263,17 @@ function buildUI() {
     }
   });
 
+  // ORDER: Play first, then Global, then Grid
+  ui.child(playGroup);
   ui.child(groupGlobal);
   ui.child(groupGrid);
-  ui.child(playGroup);
 
+  // init readouts
   f0Slider.elt.dispatchEvent(new Event('input'));
   masterSlider.elt.dispatchEvent(new Event('input'));
   tempoSlider.elt.dispatchEvent(new Event('input'));
 
+  // Resume audio politely when tab returns
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       try { ensureAudio(); setNow(masterGain.gain, (playing || anyAuditioning()) ? masterEffective() : 0); } catch {}
@@ -275,31 +283,18 @@ function buildUI() {
 
 const makeLabel = (txt) => { const s = createSpan(txt); s.style('color', '#aaa'); s.style('font-weight', 'bold'); return s; };
 
-function updateGridUI() {
-  for (let i = 0; i < PARTIALS; i++) {
-    const k = i + 1;
-    const f = Math.round(k * f0);
-    colHzLabels[i].html(`${f} Hz`);
-  }
-}
-
-function refreshPlayButton() {
-  playBtn.html(playing ? '⏸' : '▶');
-  playBtn.attribute('title', playing ? 'Pause' : 'Play');
-}
-
 // ---------- Audio construction ----------
 function buildAudio() {
   ctx = ensureAudio();
 
   // Master -> Compressor -> destination (safety, set high to stay transparent)
-  masterGain = makeMaster(0.0); // start silent
+  masterGain = makeMaster(0.0);
   comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -1.0;  // dBFS (high threshold; rarely engages)
-  comp.knee.value = 10;         // soft knee
+  comp.threshold.value = -1.0;
+  comp.knee.value = 10;
   try { comp.ratio.value = 4; } catch(_) {}
-  comp.attack.value = 0.02;     // s (longer to avoid chewing sines)
-  comp.release.value = 0.25;    // s
+  comp.attack.value = 0.02;
+  comp.release.value = 0.25;
 
   masterGain.connect(comp);
   comp.connect(ctx.destination);
@@ -345,17 +340,14 @@ function updatePartialFromSlider(i) {
   const t = audioNow();
 
   if (replacing[i]) {
-    // In Mix+playing replace mode: monitor owns the sound; keep mix at 0
     applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_TRACK_MS, t);
   } else {
-    // Normal: update mix; if auditioning (paused/seq), mirror monitor too
     applyCurve(mixGains[i].gain, mixGains[i].gain.value, v, RAMP_MS, t);
     if (auditioning[i]) {
       applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_TRACK_MS, t);
     }
   }
 
-  // Auto-normalize master as gains change
   updateMasterAutoScale(RAMP_MS);
 }
 
@@ -368,21 +360,16 @@ function startAudition(i) {
   const t = audioNow();
 
   if (playing && mode === 'mix') {
-    // Replace: crossfade mix -> 0, monitor -> v
     applyCurve(mixGains[i].gain,    mixGains[i].gain.value,    0, AUD_OPEN_MS, t);
     applyCurve(monitorGains[i].gain,monitorGains[i].gain.value,v, AUD_OPEN_MS, t);
     replacing[i] = true;
-    // Ensure router for this partial stays closed while replacing
     applyCurve(routeGains[i].gain,  routeGains[i].gain.value,  0, RAMP_MS, t);
   } else {
-    // Paused or Sequence: open monitor (and lift master if paused)
     if (!playing && masterGain) {
-      // Lift to current *normalized* master target
       applyCurve(masterGain.gain, masterGain.gain.value, masterEffective(), AUD_OPEN_MS, t);
     }
     applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_OPEN_MS, t);
   }
-  // Master auto-scale may need to move even during audition
   updateMasterAutoScale(RAMP_MS);
 }
 
@@ -394,19 +381,16 @@ function stopAudition(i) {
   const v = gains[i];
 
   if (replacing[i]) {
-    // Mix+playing: crossfade back monitor -> 0, mix -> v; reopen router
     applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, 0, AUD_CLOSE_MS, t);
     applyCurve(mixGains[i].gain,     mixGains[i].gain.value,     v, AUD_CLOSE_MS, t);
     applyCurve(routeGains[i].gain,   routeGains[i].gain.value,   1, RAMP_MS, t);
     replacing[i] = false;
   } else {
-    // Paused or Sequence: close monitor; if paused and no other audition, fade master down
     applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, 0, AUD_CLOSE_MS, t);
     if (!playing && !anyAuditioning()) {
       applyCurve(masterGain.gain, masterGain.gain.value, 0, AUD_CLOSE_MS, t);
     }
   }
-  // Master auto-scale might change after release
   updateMasterAutoScale(RAMP_MS);
 }
 
@@ -415,7 +399,6 @@ function updateRouteForMode() {
   const t = audioNow();
   if (mode === 'mix') {
     for (let i = 0; i < PARTIALS; i++) {
-      // If replacing in Mix+playing, keep route closed for that partial
       const target = playing ? (replacing[i] ? 0 : 1) : 0;
       applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, RAMP_MS, t);
     }
@@ -425,22 +408,19 @@ function updateRouteForMode() {
       applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, RAMP_MS, t);
     }
   }
-  // Whenever routing changes, ensure master reflects normalization
   updateMasterAutoScale(RAMP_MS);
 }
 
-// ----- Smooth Play/Pause with cosine master fade -----
+// ----- Smooth Play/Pause -----
 function smoothStartMix() {
   playing = true;
   refreshPlayButton();
   const t = audioNow();
-  setNow(masterGain.gain, 0); // ensure silent
-  // Open routes for all non-replacing partials; replacing ones stay closed (if any)
+  setNow(masterGain.gain, 0);
   for (let i = 0; i < PARTIALS; i++) {
     const target = replacing[i] ? 0 : 1;
     applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, RAMP_MS, t);
   }
-  // If any sliders are already held down when play is pressed, enter replace mode for them
   for (let i = 0; i < PARTIALS; i++) {
     if (auditioning[i]) {
       const vUI = parseInt(colSliders[i].value(), 10) / 100;
@@ -451,7 +431,6 @@ function smoothStartMix() {
       replacing[i] = true;
     }
   }
-  // Fade master up to normalized target
   applyCurve(masterGain.gain, 0, masterEffective(), MASTER_FADE_MS, t + 0.01);
 }
 
@@ -465,7 +444,6 @@ function smoothStartSequence() {
     const target = (i === seqIndex) ? 1 : 0;
     applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, SEQ_XFADE_MS, t);
   }
-  // Replace flags irrelevant in sequence; clear defensively
   for (let i = 0; i < PARTIALS; i++) replacing[i] = false;
   applyCurve(masterGain.gain, 0, masterEffective(), MASTER_FADE_MS, t + 0.01);
 }
@@ -495,7 +473,6 @@ function stepSequenceIfDue() {
   seqIndex++;
 
   if (seqIndex >= PARTIALS) {
-    // finished sweep: fade master down, then stop
     const t = audioNow();
     applyCurve(masterGain.gain, masterGain.gain.value, 0, MASTER_FADE_MS, t);
     setTimeout(() => {
@@ -507,7 +484,6 @@ function stepSequenceIfDue() {
     return;
   }
 
-  // Equal-power crossfade prev -> next
   const t = Math.max(now, seqNextTime);
   applyCurve(routeGains[prev].gain, routeGains[prev].gain.value, 0, SEQ_XFADE_MS, t);
   applyCurve(routeGains[seqIndex].gain, routeGains[seqIndex].gain.value, 1, SEQ_XFADE_MS, t);
@@ -515,9 +491,9 @@ function stepSequenceIfDue() {
   seqNextTime = t + (1 / tempo);
 }
 
-// ---------- Drawing ----------
+// ---------- Drawing helpers ----------
 function drawSpiralCurve(s) {
-  const thetaMax = TAU * log2(PARTIALS);
+  const thetaMax = TAU * Math.log2(PARTIALS);
   noFill(); stroke(70); strokeWeight(2);
   beginShape();
   for (let th = 0; th <= thetaMax; th += 0.02) {
@@ -530,13 +506,13 @@ function drawSpiralCurve(s) {
 function drawPartials(s) {
   for (let i = 0; i < PARTIALS; i++) {
     const k = i + 1;
-    const th = thetaForMultiple(k);
+    const th = (Math.log2(k)) * TAU;  // thetaForMultiple(k)
     const r = (k * X_BASE) * s;
     const px = r * Math.cos(th);
     const py = r * Math.sin(th);
 
     const g = gains[i];
-    const alpha = g / PARTIAL_MAX; // normalize for alpha 0..1
+    const alpha = g / PARTIAL_MAX;
     const col = color(220, 210, 140, 255 * alpha);
 
     stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
