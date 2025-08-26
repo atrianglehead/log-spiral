@@ -105,10 +105,11 @@ function updateMasterAutoScale(ms = RAMP_MS) {
 
 // ---------- Setup ----------
 window.setup = function () {
-  // Use the browser's inner dimensions to size the canvas. In some module
-  // contexts, p5's windowWidth/windowHeight globals can be undefined, which
-  // results in a zero-sized drawing surface and the spiral not appearing.
-  createCanvas(window.innerWidth, window.innerHeight);   // fill viewport
+
+  // Size the canvas to fill the viewport. p5's windowWidth/windowHeight reflect
+  // the browser's inner dimensions and stay in sync with resize events.
+  createCanvas(windowWidth, windowHeight);
+
   pixelDensity(2);
   strokeCap(ROUND);
   textFont('system-ui, -apple-system, Segoe UI, Roboto, sans-serif');
@@ -125,7 +126,9 @@ window.setup = function () {
 
 window.windowResized = function () {
   // Keep the canvas in sync with the viewport if it changes size.
-  resizeCanvas(window.innerWidth, window.innerHeight);
+
+  resizeCanvas(windowWidth, windowHeight);
+
 };
 
 window.draw = function () {
@@ -177,13 +180,13 @@ window.draw = function () {
       const py = r * Math.sin(th);
 
       const g = gains[i];
-      const alpha = g / 0.85; // PARTIAL_MAX
-      const col = window.color(220, 210, 140, 255 * alpha);
-      
-      stroke(window.red(col), window.green(col), window.blue(col), alpha * 255); strokeWeight(2);
+      const alpha = g / PARTIAL_MAX;
+      const col = color(220, 210, 140, 255 * alpha);
+
+      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
       line(0, 0, px, py);
 
-      noStroke(); fill(window.red(col), window.green(col), window.blue(col), alpha * 255);
+      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
       circle(px, py, 8);
 
       fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
