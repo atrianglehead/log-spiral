@@ -185,7 +185,9 @@ function buildUI() {
   });
 
   groupGlobal.child(makeLabel('Spiral curve:'));
-  curveCheckbox = createCheckbox('', showCurve);
+  curveCheckbox = createCheckbox();        // no label
+  curveCheckbox.parent(groupGlobal);       // re-parent into the panel
+  curveCheckbox.checked(showCurve);
   curveCheckbox.changed(() => { showCurve = curveCheckbox.checked(); });
 
   groupGlobal.child(makeLabel('Mode:'));
