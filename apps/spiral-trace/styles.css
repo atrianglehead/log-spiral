@@ -2,6 +2,7 @@
 html, body {
   margin: 0;
   background: #0b0b0b;
+  color: #eaeaea;
 }
 
 /* Floating control panel */
@@ -14,19 +15,18 @@ html, body {
   align-items: center;
   flex-wrap: wrap;
 
-  background: #0f0f0fEE;  /* slightly translucent */
+  background: #0f0f0fee;
   padding: 8px 12px;
   border-radius: 12px;
   border: 1px solid #2a2a2a;
 
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: #ddd;
 
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
 
-/* Group boxes for Visual / Audio */
+/* Group boxes */
 .group {
   display: flex;
   flex-direction: row;
@@ -46,17 +46,17 @@ html, body {
   margin-right: 6px;
 }
 
-/* Keep certain things on one line */
+/* Keep items on one line (Speed row) */
 .nowrap {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  flex-wrap: nowrap;        /* <— prevents label/slider from separating */
+  flex-wrap: nowrap;
   white-space: nowrap;
 }
 
-/* Form elements (covers Play/Pause too) */
+/* Form elements */
 .ui select,
 .ui input,
 .ui button {
@@ -73,16 +73,16 @@ html, body {
 .ui button:hover { border-color: #3a3a3a; }
 .ui button:active { transform: translateY(1px); }
 
-/* Sliders */
+/* Horizontal sliders */
 .slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 160px;             /* a bit wider; adjust if needed */
+  width: 160px;
   height: 4px;
   border-radius: 4px;
   background: #2c2c2c;
   outline: none;
-  flex: 0 0 auto;           /* <— don’t shrink; keeps row intact */
+  flex: 0 0 auto;
 }
 
 /* WebKit */
@@ -96,7 +96,6 @@ html, body {
   cursor: pointer;
   border: 1px solid #777;
 }
-
 /* Firefox */
 .slider::-moz-range-thumb {
   width: 14px;
@@ -107,12 +106,7 @@ html, body {
   border: 1px solid #777;
 }
 
-/* Optional width helpers if you want to apply via JS (.addClass) */
-input[type="number"].w-64  { width: 64px; }
-input[type="number"].w-72  { width: 72px; }
-input[type="number"].w-96  { width: 96px; }
-
-/* Play/Pause group */
+/* Larger Play/Pause button in its own group */
 .group.playctrl {
   display: flex;
   align-items: center;
@@ -123,9 +117,8 @@ input[type="number"].w-96  { width: 96px; }
   background: #111111aa;
 }
 
-/* Make Play/Pause button larger */
 .play-btn {
-  font-size: 20px;       /* 1.5x normal 13px controls */
-  padding: 6px 12px;     /* more padding */
+  font-size: 20px;      /* ~1.5× typical control text */
+  padding: 6px 12px;
   border-radius: 8px;
 }
