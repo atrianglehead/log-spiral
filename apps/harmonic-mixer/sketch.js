@@ -122,7 +122,26 @@ window.setup = function () {
 window.draw = function () {
   background(11);
 
-  const area = getSafeArea(document.querySelector('canvas'), ui.elt, { w: width, h: height, gap: 12, margin: MARGIN });
+  // Reserve the top region of the canvas for the spiral, above the bottom-docked UI panel.
+  // We measure the panel height from the DOM and subtract it from the canvas height.
+  const panelRect = ui?.elt?.getBoundingClientRect?.() || { height: 0, top: 0 };
+  const canvasRect = document.querySelector('canvas').getBoundingClientRect();
+
+  // Panel height that overlaps our canvas (guard if panel extends beyond canvas)
+  const overlapH = Math.max(
+    0,
+    Math.min(canvasRect.bottom, panelRect.top + panelRect.height) - Math.max(canvasRect.top, panelRect.top)
+  );
+
+  const topH = Math.max(0, height - overlapH - MARGIN); // leave a little margin
+  const area = {
+    w: width - 2 * MARGIN,
+    h: Math.max(0, topH - MARGIN),
+    cx: width / 2,
+    cy: Math.max(0, (topH) / 2),
+  };
+
+  // scale to fit the intended final radius inside the available top area
   const finalR_unscaled = X_BASE * PARTIALS;
   const s = fitScale(finalR_unscaled, area, MARGIN);
 
@@ -130,14 +149,20 @@ window.draw = function () {
   translate(area.cx, area.cy);
 
   if (showCurve) drawSpiralCurve(s);
+
+  // axes
   stroke(50); strokeWeight(1);
-  line(-area.w/2, 0, area.w/2, 0); line(0, -area.h/2, 0, area.h/2);
+  line(-area.w/2, 0, area.w/2, 0);
+  line(0, -area.h/2, 0, area.h/2);
+
+  // partials
   drawPartials(s);
 
   pop();
 
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
+
 
 // ---------- UI ----------
 function buildUI() {
