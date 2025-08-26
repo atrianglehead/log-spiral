@@ -13,9 +13,9 @@ const MARGIN = 32;
 const RAMP_MS        = 60;   // general per-parameter smoothing
 const SEQ_XFADE_MS   = 60;   // sequence crossfade
 const MASTER_FADE_MS = 180;  // master fade on play/pause
-const AUD_OPEN_MS    = 30;   // audition open
+const AUD_OPEN_MS    = 40;   // audition open (and mix->monitor crossfade in Mix mode)
 const AUD_TRACK_MS   = 30;   // audition while dragging
-const AUD_CLOSE_MS   = 80;   // audition close
+const AUD_CLOSE_MS   = 80;   // audition close (and monitor->mix crossfade in Mix mode)
 
 const DEFAULT_TEMPO = 4;     // steps/sec (sequence)
 
@@ -28,8 +28,9 @@ let playing = false;
 let tempo = DEFAULT_TEMPO;
 let seqIndex = 0;
 let seqNextTime = 0;
-const auditioning = Array(PARTIALS).fill(false);
-let wasPlayingBeforeAudition = false; // for master auto-raise while paused
+
+const auditioning = Array(PARTIALS).fill(false); // slider is being held
+const replacing   = Array(PARTIALS).fill(false); // in Mix+playing: route closed, monitor owns sound
 
 // p5 + UI
 let ui, groupGlobal, groupGrid, playGroup;
@@ -40,6 +41,7 @@ let colHzLabels = [];
 // ---------- Audio graph ----------
 let ctx = null;
 let masterGain = null;
+let comp = null; // gentle safety compressor
 // per partial: osc -> mixGain -> routeGain -> master
 // plus parallel monitor (audition) gain: osc -> monitorGain -> master
 const oscs = [];
@@ -66,9 +68,11 @@ function setNow(param, v) {
   if (param.setValueAtTime) param.setValueAtTime(v, t);
 }
 
-// helper: current master slider (0..1)
-const masterSliderValue = () =>
-  parseInt(masterSlider?.value() ?? Math.round(DEFAULT_MASTER * 100), 10) / 100;
+// helper: current master slider (0..1) with small headroom
+const masterSliderValue = () => {
+  const uiVal = parseInt(masterSlider?.value() ?? Math.round(DEFAULT_MASTER * 100), 10) / 100;
+  return Math.min(0.9, uiVal); // ~ -0.9 dB headroom
+};
 
 // ---------- Setup ----------
 window.setup = function () {
@@ -259,7 +263,18 @@ function refreshPlayButton() {
 // ---------- Audio construction ----------
 function buildAudio() {
   ctx = ensureAudio();
-  masterGain = makeMaster(0.0); // start at 0
+
+  // Master -> Compressor -> destination
+  masterGain = makeMaster(0.0); // start silent
+  comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -12;
+  comp.knee.value = 20;
+  try { comp.ratio.value = 4; } catch(_) {}
+  comp.attack.value = 0.003;
+  comp.release.value = 0.25;
+
+  masterGain.connect(comp);
+  comp.connect(ctx.destination);
 
   for (let i = 0; i < PARTIALS; i++) {
     const osc = ctx.createOscillator(); osc.type = 'sine';
@@ -297,31 +312,43 @@ function updatePartialFromSlider(i) {
   ensureAudio();
   const v = parseInt(colSliders[i].value(), 10) / 100;
   gains[i] = v;
+
   const t = audioNow();
-  // main mix path
-  applyCurve(mixGains[i].gain, mixGains[i].gain.value, v, RAMP_MS, t);
-  // audition path mirrors while held
-  if (auditioning[i]) {
+
+  if (replacing[i]) {
+    // In Mix+playing replace mode: monitor owns the sound; keep mix at 0
     applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_TRACK_MS, t);
+  } else {
+    // Normal: update mix; if auditioning (paused/seq), mirror monitor too
+    applyCurve(mixGains[i].gain, mixGains[i].gain.value, v, RAMP_MS, t);
+    if (auditioning[i]) {
+      applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_TRACK_MS, t);
+    }
   }
 }
 
 function startAudition(i) {
   ensureAudio();
-  wasPlayingBeforeAudition = playing;
   auditioning[i] = true;
 
   const v = parseInt(colSliders[i].value(), 10) / 100;
   const t = audioNow();
 
-  // If we are paused, bring master up to current master level just for audition
-  if (!playing && masterGain) {
-    const target = masterSliderValue();
-    applyCurve(masterGain.gain, masterGain.gain.value, target, AUD_OPEN_MS, t);
+  if (playing && mode === 'mix') {
+    // Replace: crossfade mix -> 0, monitor -> v
+    applyCurve(mixGains[i].gain,    mixGains[i].gain.value,    0, AUD_OPEN_MS, t);
+    applyCurve(monitorGains[i].gain,monitorGains[i].gain.value,v, AUD_OPEN_MS, t);
+    replacing[i] = true;
+    // Ensure router for this partial stays closed while replacing
+    applyCurve(routeGains[i].gain,  routeGains[i].gain.value,  0, RAMP_MS, t);
+  } else {
+    // Paused or Sequence: open monitor (and lift master if paused)
+    if (!playing && masterGain) {
+      const target = masterSliderValue();
+      applyCurve(masterGain.gain, masterGain.gain.value, target, AUD_OPEN_MS, t);
+    }
+    applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_OPEN_MS, t);
   }
-
-  // Open monitor gain for this partial
-  applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_OPEN_MS, t);
 }
 
 function stopAudition(i) {
@@ -329,12 +356,20 @@ function stopAudition(i) {
   auditioning[i] = false;
 
   const t = audioNow();
-  // Close monitor gain
-  applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, 0, AUD_CLOSE_MS, t);
+  const v = gains[i];
 
-  // If we were paused before and no other slider is being auditioned, fade master back to 0
-  if (!wasPlayingBeforeAudition && !playing && !anyAuditioning()) {
-    applyCurve(masterGain.gain, masterGain.gain.value, 0, AUD_CLOSE_MS, t);
+  if (replacing[i]) {
+    // Mix+playing: crossfade back monitor -> 0, mix -> v; reopen router
+    applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, 0, AUD_CLOSE_MS, t);
+    applyCurve(mixGains[i].gain,     mixGains[i].gain.value,     v, AUD_CLOSE_MS, t);
+    applyCurve(routeGains[i].gain,   routeGains[i].gain.value,   1, RAMP_MS, t);
+    replacing[i] = false;
+  } else {
+    // Paused or Sequence: close monitor; if paused and no other audition, fade master down
+    applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, 0, AUD_CLOSE_MS, t);
+    if (!playing && !anyAuditioning()) {
+      applyCurve(masterGain.gain, masterGain.gain.value, 0, AUD_CLOSE_MS, t);
+    }
   }
 }
 
@@ -343,7 +378,8 @@ function updateRouteForMode() {
   const t = audioNow();
   if (mode === 'mix') {
     for (let i = 0; i < PARTIALS; i++) {
-      const target = playing ? 1 : 0;
+      // If replacing in Mix+playing, keep route closed for that partial
+      const target = playing ? (replacing[i] ? 0 : 1) : 0;
       applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, RAMP_MS, t);
     }
   } else {
@@ -360,7 +396,22 @@ function smoothStartMix() {
   refreshPlayButton();
   const t = audioNow();
   setNow(masterGain.gain, 0); // ensure silent
-  for (let i = 0; i < PARTIALS; i++) applyCurve(routeGains[i].gain, routeGains[i].gain.value, 1, RAMP_MS, t);
+  // Open routes for all non-replacing partials; replacing ones stay closed (if any)
+  for (let i = 0; i < PARTIALS; i++) {
+    const target = replacing[i] ? 0 : 1;
+    applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, RAMP_MS, t);
+  }
+  // If any sliders are already held down when play is pressed, enter replace mode for them
+  for (let i = 0; i < PARTIALS; i++) {
+    if (auditioning[i]) {
+      const v = parseInt(colSliders[i].value(), 10) / 100;
+      // ensure mix at 0, monitor at v, router closed
+      applyCurve(mixGains[i].gain,     mixGains[i].gain.value,     0, AUD_OPEN_MS, t);
+      applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_OPEN_MS, t);
+      applyCurve(routeGains[i].gain,   routeGains[i].gain.value,   0, RAMP_MS, t);
+      replacing[i] = true;
+    }
+  }
   applyCurve(masterGain.gain, 0, masterSliderValue(), MASTER_FADE_MS, t + 0.01);
 }
 
@@ -374,6 +425,8 @@ function smoothStartSequence() {
     const target = (i === seqIndex) ? 1 : 0;
     applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, SEQ_XFADE_MS, t);
   }
+  // Any replacing flags are irrelevant in sequence; clear them defensively
+  for (let i = 0; i < PARTIALS; i++) replacing[i] = false;
   applyCurve(masterGain.gain, 0, masterSliderValue(), MASTER_FADE_MS, t + 0.01);
 }
 
