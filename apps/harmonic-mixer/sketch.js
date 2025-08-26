@@ -10,14 +10,14 @@ const X_BASE = 120;      // px for k=1
 const MARGIN = 32;
 
 // Cosine/equal-power curve times (ms)
-const RAMP_MS       = 60;   // general per-parameter smoothing
-const SEQ_XFADE_MS  = 60;   // sequence crossfade
-const MASTER_FADE_MS= 180;  // master fade on play/pause
-const AUD_OPEN_MS   = 30;   // audition open
-const AUD_TRACK_MS  = 30;   // audition while dragging
-const AUD_CLOSE_MS  = 80;   // audition close
+const RAMP_MS        = 60;   // general per-parameter smoothing
+const SEQ_XFADE_MS   = 60;   // sequence crossfade
+const MASTER_FADE_MS = 180;  // master fade on play/pause
+const AUD_OPEN_MS    = 30;   // audition open
+const AUD_TRACK_MS   = 30;   // audition while dragging
+const AUD_CLOSE_MS   = 80;   // audition close
 
-const DEFAULT_TEMPO = 4;    // steps/sec (sequence)
+const DEFAULT_TEMPO = 4;     // steps/sec (sequence)
 
 // ---------- State ----------
 let f0 = DEFAULT_F0;
@@ -29,6 +29,7 @@ let tempo = DEFAULT_TEMPO;
 let seqIndex = 0;
 let seqNextTime = 0;
 const auditioning = Array(PARTIALS).fill(false);
+let wasPlayingBeforeAudition = false; // for master auto-raise while paused
 
 // p5 + UI
 let ui, groupGlobal, groupGrid, playGroup;
@@ -52,25 +53,20 @@ function applyCurve(param, from, to, ms, at = audioNow()) {
   const N = 128;
   const curve = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    const t = i / (N - 1);                     // 0..1
+    const t = i / (N - 1);                       // 0..1
     const y = 0.5 - 0.5 * Math.cos(Math.PI * t); // cosine ease-in-out
     curve[i] = from + (to - from) * y;
   }
   param.cancelScheduledValues(at);
-  // Keep current value coherent
-  if (typeof param.value === 'number') {
-    // No-op; setValueCurveAtTime will take control
-  }
   param.setValueCurveAtTime(curve, at, dur);
 }
-
 function setNow(param, v) {
   const t = audioNow();
   param.cancelScheduledValues(t);
   if (param.setValueAtTime) param.setValueAtTime(v, t);
 }
 
-// helper: read current master slider (0..1)
+// helper: current master slider (0..1)
 const masterSliderValue = () =>
   parseInt(masterSlider?.value() ?? Math.round(DEFAULT_MASTER * 100), 10) / 100;
 
@@ -88,7 +84,7 @@ window.setup = function () {
   updateRouteForMode();
   refreshPlayButton();
 
-  // Ensure master really starts at 0 to avoid resume pops
+  // ensure master starts at 0 to avoid resume pops
   if (masterGain) setNow(masterGain.gain, 0);
 };
 
@@ -231,7 +227,7 @@ function buildUI() {
   masterSlider.elt.dispatchEvent(new Event('input'));
   tempoSlider.elt.dispatchEvent(new Event('input'));
 
-  // If tab returns to foreground, keep context alive with master at 0 until Play
+  // Resume audio politely when tab returns
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       try { ensureAudio(); if (masterGain) setNow(masterGain.gain, playing ? masterSliderValue() : 0); } catch {}
@@ -263,7 +259,7 @@ function refreshPlayButton() {
 // ---------- Audio construction ----------
 function buildAudio() {
   ctx = ensureAudio();
-  masterGain = makeMaster(0.0); // start at 0 to avoid any resume pop
+  masterGain = makeMaster(0.0); // start at 0
 
   for (let i = 0; i < PARTIALS; i++) {
     const osc = ctx.createOscillator(); osc.type = 'sine';
@@ -285,13 +281,16 @@ function setF0(newF0) {
   f0 = newF0;
   const t = audioNow();
   for (let i = 0; i < PARTIALS; i++) {
-    // frequency changes are already smooth in browsers; wrap anyway
-    const from = oscs[i].frequency.value;
     const to = (i + 1) * f0;
-    // emulate ramp with small steps: use setValueAtTime to 'to'
     oscs[i].frequency.setValueAtTime(to, t + RAMP_MS / 1000);
   }
   updateGridUI();
+}
+
+// ---------- Audition & gains ----------
+function anyAuditioning() {
+  for (let i = 0; i < PARTIALS; i++) if (auditioning[i]) return true;
+  return false;
 }
 
 function updatePartialFromSlider(i) {
@@ -299,27 +298,54 @@ function updatePartialFromSlider(i) {
   const v = parseInt(colSliders[i].value(), 10) / 100;
   gains[i] = v;
   const t = audioNow();
+  // main mix path
   applyCurve(mixGains[i].gain, mixGains[i].gain.value, v, RAMP_MS, t);
-  if (auditioning[i]) applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_TRACK_MS, t);
+  // audition path mirrors while held
+  if (auditioning[i]) {
+    applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_TRACK_MS, t);
+  }
 }
 
 function startAudition(i) {
   ensureAudio();
+  wasPlayingBeforeAudition = playing;
   auditioning[i] = true;
+
   const v = parseInt(colSliders[i].value(), 10) / 100;
-  applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_OPEN_MS, audioNow());
+  const t = audioNow();
+
+  // If we are paused, bring master up to current master level just for audition
+  if (!playing && masterGain) {
+    const target = masterSliderValue();
+    applyCurve(masterGain.gain, masterGain.gain.value, target, AUD_OPEN_MS, t);
+  }
+
+  // Open monitor gain for this partial
+  applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, v, AUD_OPEN_MS, t);
 }
 
 function stopAudition(i) {
   if (!auditioning[i]) return;
   auditioning[i] = false;
-  applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, 0, AUD_CLOSE_MS, audioNow());
+
+  const t = audioNow();
+  // Close monitor gain
+  applyCurve(monitorGains[i].gain, monitorGains[i].gain.value, 0, AUD_CLOSE_MS, t);
+
+  // If we were paused before and no other slider is being auditioned, fade master back to 0
+  if (!wasPlayingBeforeAudition && !playing && !anyAuditioning()) {
+    applyCurve(masterGain.gain, masterGain.gain.value, 0, AUD_CLOSE_MS, t);
+  }
 }
 
+// ---------- Routing & transport ----------
 function updateRouteForMode() {
   const t = audioNow();
   if (mode === 'mix') {
-    for (let i = 0; i < PARTIALS; i++) applyCurve(routeGains[i].gain, routeGains[i].gain.value, playing ? 1 : 0, RAMP_MS, t);
+    for (let i = 0; i < PARTIALS; i++) {
+      const target = playing ? 1 : 0;
+      applyCurve(routeGains[i].gain, routeGains[i].gain.value, target, RAMP_MS, t);
+    }
   } else {
     for (let i = 0; i < PARTIALS; i++) {
       const target = (playing && i === seqIndex) ? 1 : 0;
@@ -333,10 +359,8 @@ function smoothStartMix() {
   playing = true;
   refreshPlayButton();
   const t = audioNow();
-  // Ensure master is zero before opening routers
-  setNow(masterGain.gain, 0);
+  setNow(masterGain.gain, 0); // ensure silent
   for (let i = 0; i < PARTIALS; i++) applyCurve(routeGains[i].gain, routeGains[i].gain.value, 1, RAMP_MS, t);
-  // Fade master up with equal-power curve
   applyCurve(masterGain.gain, 0, masterSliderValue(), MASTER_FADE_MS, t + 0.01);
 }
 
@@ -355,9 +379,7 @@ function smoothStartSequence() {
 
 function smoothPauseAll() {
   const t = audioNow();
-  // Fade master down first
   applyCurve(masterGain.gain, masterGain.gain.value, 0, MASTER_FADE_MS, t);
-  // After fade completes, close routers and mark paused
   setTimeout(() => {
     const t2 = audioNow();
     for (let i = 0; i < PARTIALS; i++) applyCurve(routeGains[i].gain, routeGains[i].gain.value, 0, RAMP_MS, t2);
