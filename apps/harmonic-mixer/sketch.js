@@ -173,12 +173,12 @@ window.draw = function () {
 
       const g = gains[i];
       const alpha = g / 0.85; // PARTIAL_MAX
-      const col = color(220, 210, 140, 255 * alpha);
-
-      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+      const col = window.color(220, 210, 140, 255 * alpha);
+      
+      stroke(window.red(col), window.green(col), window.blue(col), alpha * 255); strokeWeight(2);
       line(0, 0, px, py);
 
-      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+      noStroke(); fill(window.red(col), window.green(col), window.blue(col), alpha * 255);
       circle(px, py, 8);
 
       fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
