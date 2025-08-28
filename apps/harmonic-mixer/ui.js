@@ -10,7 +10,7 @@ export const getShowCurve = () => showCurve;
 export const getViewMode = () => viewMode;
 
 let ui, tabContainer, tabSpiral, tabComponents, groupGlobal, groupGrid, playGroup;
-let f0Slider, masterSlider, curveCheckbox, modeSelect, tempoSlider, tempoRow, playBtn;
+let f0Slider, masterSlider, curveCheckbox, tempoSlider, tempoRow, playBtn;
 export const colSliders = [];
 const colHzLabels = [];
 
@@ -91,15 +91,27 @@ export function buildUI() {
   curveCheckbox.checked(showCurve);
   curveCheckbox.changed(() => { showCurve = curveCheckbox.checked(); });
 
-  groupGlobal.child(makeLabel('Mode:'));
-  modeSelect = createSelect();
-  modeSelect.option('Together', 'mix');
-  modeSelect.option('Sequence', 'seq');
-  modeSelect.value(getMode());
-  groupGlobal.child(modeSelect);
-  modeSelect.changed(() => {
-    setMode(modeSelect.value());
-    tempoRow.style('display', getMode() === 'seq' ? 'flex' : 'none');
+  const modeRow = createDiv().addClass('nowrap');
+  const togetherLabel = createSpan('Play Together');
+  const modeToggle = createDiv().addClass('mode-toggle');
+  const modeKnob = createDiv().addClass('mode-knob');
+  modeToggle.child(modeKnob);
+  const seqLabel = createSpan('Play Sequentially');
+  modeRow.child(togetherLabel);
+  modeRow.child(modeToggle);
+  modeRow.child(seqLabel);
+  groupGlobal.child(modeRow);
+
+  const updateModeToggle = () => {
+    const isSeq = getMode() === 'seq';
+    if (isSeq) modeToggle.addClass('seq'); else modeToggle.removeClass('seq');
+    tempoRow.style('display', isSeq ? 'flex' : 'none');
+  };
+
+  modeRow.mousePressed(() => {
+    const next = getMode() === 'seq' ? 'mix' : 'seq';
+    setMode(next);
+    updateModeToggle();
   });
 
   tempoRow = createDiv().addClass('nowrap');
@@ -107,13 +119,13 @@ export function buildUI() {
   tempoSlider = createSlider(1, 12, DEFAULT_TEMPO, 1); tempoSlider.addClass('slider');
   const tVal = createSpan('').style('color', '#cfcfcf');
   tempoRow.child(tempoSlider); tempoRow.child(tVal);
-  tempoRow.style('display', getMode() === 'seq' ? 'flex' : 'none');
   groupGlobal.child(tempoRow);
   tempoSlider.elt.addEventListener('input', () => {
     const val = parseInt(tempoSlider.value(), 10);
     setTempo(val);
     tVal.html(' ' + val + ' steps/sec');
   });
+  updateModeToggle();
 
   // Grid of partials
   groupGrid = createDiv().addClass('group').style('width', '100%');
@@ -121,7 +133,7 @@ export function buildUI() {
   for (let i = 0; i < PARTIALS; i++) {
     const k = i + 1;
     const col = createDiv().addClass('hcol');
-    const label = createSpan('k=' + k);
+    const label = createSpan('' + k);
     const [rCol, gCol, bCol] = octaveColor(k);
     const v = createSlider(0, 100, Math.round((gains[i] / PARTIAL_MAX) * 100), 1); v.addClass('vslider');
     const color = `rgb(${rCol}, ${gCol}, ${bCol})`;

@@ -111,6 +111,8 @@ export function drawPartials(s) {
     noStroke();
     fill(rCol, gCol, bCol, alpha * 255);
     circle(px, py, terminalCircleSize(k));
-    drawPartialLabel(px, py, `${k}`, k);
+    if (g > 0) {
+      drawPartialLabel(px, py, `${k}`, k);
+    }
   }
 }
