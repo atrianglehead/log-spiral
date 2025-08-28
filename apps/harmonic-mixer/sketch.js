@@ -25,19 +25,20 @@ const DEFAULT_TEMPO  = 4;    // steps/sec (sequence)
 
 // Octave colors: all partials within an octave share a color.
 // Colors cycle if the octave index exceeds the palette length.
+// Pick vibrant, high-contrast hues so overlapping partials remain distinct.
 const OCTAVE_COLORS = [
-  [230, 120, 120],
-  [120, 230, 120],
-  [120, 120, 230],
-  [230, 230, 120],
-  [230, 120, 230],
-  [120, 230, 230],
+  [255, 80, 80],   // red
+  [80, 255, 80],   // green
+  [80, 80, 255],   // blue
+  [255, 200, 80],  // yellow/orange
+  [200, 80, 255],  // purple
+  [80, 255, 255],  // cyan
 ];
 
 // Base line widths: odd-numbered partials use ODD_WEIGHT.
-// Even-numbered partials are slightly wider than half their number.
+// Every factor of two increases width by EVEN_DELTA for better visibility.
 const ODD_WEIGHT = 2;
-const EVEN_DELTA = 0.5;
+const EVEN_DELTA = 1;
 
 function octaveColor(k) {
   const idx = Math.floor(Math.log2(k)) % OCTAVE_COLORS.length;
@@ -55,6 +56,23 @@ function partialStrokeWeight(k) {
 
 function terminalCircleSize(k) {
   return (k & (k - 1)) === 0 ? 8 : 6;
+}
+
+function drawLabelBox(x, y, label) {
+  push();
+  const PAD = 6;
+  const TS = 12;
+  textSize(TS);
+  const w = textWidth(label) + PAD * 2;
+  const h = TS + PAD * 2;
+  rectMode(CENTER);
+  noStroke();
+  fill(20, 20, 25, 220);
+  rect(x, y, w, h, 6);
+  fill(220);
+  textAlign(CENTER, CENTER);
+  text(label, x, y);
+  pop();
 }
 
 // ---------- State ----------
@@ -269,6 +287,7 @@ window.draw = function () {
     }
 
     pop();
+    drawLabelBox(cx, cy + circleR + 16, 'Angle');
 
     // ----- Right: lengths as vertical lines -----
     const baseY = cy + circleR;
@@ -292,6 +311,8 @@ window.draw = function () {
       fill(rCol, gCol, bCol, alpha * 255);
       circle(x, yTop, terminalCircleSize(k));
     }
+
+    drawLabelBox(halfWidth + halfWidth / 2, baseY + 16, 'Length');
   }
 
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
