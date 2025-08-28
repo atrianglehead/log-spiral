@@ -32,12 +32,13 @@ let playing = false;
 let tempo = DEFAULT_TEMPO;
 let seqIndex = 0;
 let seqNextTime = 0;
+let viewMode = 'spiral'; // 'spiral' | 'components'
 
 const auditioning = Array(PARTIALS).fill(false);
 const replacing   = Array(PARTIALS).fill(false);
 
 // p5 + UI
-let ui, groupGlobal, groupGrid, playGroup;
+let ui, tabContainer, tabSpiral, tabComponents, groupGlobal, groupGrid, playGroup;
 let f0Slider, masterSlider, curveCheckbox, modeSelect, tempoSlider, tempoRow, playBtn;
 let colSliders = [];
 let colHzLabels = [];
@@ -132,65 +133,66 @@ window.windowResized = function () {
 window.draw = function () {
   background(11);
 
-  // Spiral bounds: square occupying 80% of the smaller canvas dimension.
-  const boundSide = 0.8 * Math.min(width, height);
-  const maxRadiusPixels = Math.max(0, boundSide / 2);
+  if (viewMode === 'spiral') {
+    // Spiral bounds: square occupying 80% of the smaller canvas dimension.
+    const boundSide = 0.8 * Math.min(width, height);
+    const maxRadiusPixels = Math.max(0, boundSide / 2);
 
-  // Center of the canvas
-  const cx = Math.floor(width / 2);
-  const cy = Math.floor(height / 2);
+    // Center of the canvas
+    const cx = Math.floor(width / 2);
+    const cy = Math.floor(height / 2);
 
+    // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the bounds
+    const finalUnscaledR  = X_BASE * PARTIALS; // outer radius before scaling
+    const s = finalUnscaledR > 0 ? (maxRadiusPixels / finalUnscaledR) : 0;
 
-  // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the bounds
-  const finalUnscaledR  = X_BASE * PARTIALS; // outer radius before scaling
-  const s = finalUnscaledR > 0 ? (maxRadiusPixels / finalUnscaledR) : 0;
+    push();
+    translate(cx, cy);
 
-  push();
-  translate(cx, cy);
-
-  if (s > 0 && showCurve) {
-    // Spiral curve
-    const thetaMax = TAU * Math.log2(PARTIALS);
-    noFill(); stroke(70); strokeWeight(2);
-    beginShape();
-    for (let th = 0; th <= thetaMax; th += 0.02) {
-      const r = X_BASE * Math.pow(2, th / TAU) * s;
-      vertex(r * Math.cos(th), r * Math.sin(th));
+    if (s > 0 && showCurve) {
+      // Spiral curve
+      const thetaMax = TAU * Math.log2(PARTIALS);
+      noFill(); stroke(70); strokeWeight(2);
+      beginShape();
+      for (let th = 0; th <= thetaMax; th += 0.02) {
+        const r = X_BASE * Math.pow(2, th / TAU) * s;
+        vertex(r * Math.cos(th), r * Math.sin(th));
+      }
+      endShape();
     }
-    endShape();
-  }
 
-  if (s > 0) {
-    // Axes
-    stroke(50); strokeWeight(1);
-    line(-boundSide/2, 0, boundSide/2, 0);
-    line(0, -boundSide/2, 0, boundSide/2);
+    if (s > 0) {
+      // Axes
+      stroke(50); strokeWeight(1);
+      line(-boundSide/2, 0, boundSide/2, 0);
+      line(0, -boundSide/2, 0, boundSide/2);
 
-    // Partials
-    for (let i = 0; i < PARTIALS; i++) {
-      const k = i + 1;
-      const th = Math.log2(k) * TAU;
-      const r  = (k * X_BASE) * s;
-      const px = r * Math.cos(th);
-      const py = r * Math.sin(th);
+      // Partials
+      for (let i = 0; i < PARTIALS; i++) {
+        const k = i + 1;
+        const th = Math.log2(k) * TAU;
+        const r  = (k * X_BASE) * s;
+        const px = r * Math.cos(th);
+        const py = r * Math.sin(th);
 
-      const g = gains[i];
-      const alpha = g / PARTIAL_MAX;
-      const col = color(220, 210, 140, 255 * alpha);
+        const g = gains[i];
+        const alpha = g / PARTIAL_MAX;
+        const col = color(220, 210, 140, 255 * alpha);
 
-      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
-      line(0, 0, px, py);
+        stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+        line(0, 0, px, py);
 
-      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
-      circle(px, py, 8);
+        noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+        circle(px, py, 8);
 
-      fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
-      const off = 16;
-      text(`${k}`, px + off * Math.cos(th), py + off * Math.sin(th));
+        fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
+        const off = 16;
+        text(`${k}`, px + off * Math.cos(th), py + off * Math.sin(th));
+      }
     }
-  }
 
-  pop();
+    pop();
+  }
 
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
@@ -211,7 +213,24 @@ function updateGridUI() {
 function buildUI() {
   ui = createDiv().addClass('ui');
 
-  // Play group (now first)
+  // View tabs
+  tabContainer = createDiv().addClass('view-tabs');
+  tabSpiral = createSpan('Spiral View').addClass('view-tab').addClass('active');
+  tabComponents = createSpan('Component View').addClass('view-tab');
+  tabContainer.child(tabSpiral);
+  tabContainer.child(tabComponents);
+  tabSpiral.mousePressed(() => {
+    viewMode = 'spiral';
+    tabSpiral.addClass('active');
+    tabComponents.removeClass('active');
+  });
+  tabComponents.mousePressed(() => {
+    viewMode = 'components';
+    tabComponents.addClass('active');
+    tabSpiral.removeClass('active');
+  });
+
+  // Play group
   playGroup = createDiv().addClass('group');
   playBtn = createButton('▶'); playBtn.addClass('play-btn'); playBtn.attribute('title', 'Play/Pause');
   playGroup.child(playBtn);
@@ -312,7 +331,8 @@ function buildUI() {
     }
   });
 
-  // ORDER: Play first, then Global, then Grid
+  // ORDER: Tabs, Play, Global, then Grid
+  ui.child(tabContainer);
   ui.child(playGroup);
   ui.child(groupGlobal);
   ui.child(groupGrid);

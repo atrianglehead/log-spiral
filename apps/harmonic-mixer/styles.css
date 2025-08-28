@@ -53,6 +53,25 @@ canvas{
   overflow-x: hidden;
 }
 
+/* View tabs */
+.view-tabs{
+  display:flex;
+  justify-content:center;
+  gap:8px;
+}
+.view-tab{
+  padding:4px 12px;
+  border:1px solid var(--panel-border);
+  border-radius:8px;
+  background:#1a1a1f;
+  cursor:pointer;
+  user-select:none;
+}
+.view-tab.active{
+  background:var(--accent);
+  color:#000;
+}
+
 /* Groups */
 .group{
   display:flex;
@@ -101,7 +120,7 @@ canvas{
   border: 0;
   box-shadow: 0 0 0 3px #00000033;
 }
-select, .play-btn { font: inherit; }
+select, .play-btn, .view-tab { font: inherit; }
 
 /* Play button */
 .play-btn{
