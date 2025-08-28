@@ -114,7 +114,28 @@ window.draw = function () {
 
     angleLabelGroups.forEach(({ th, px, py, ks }) => {
       const sorted = ks.slice().sort((a, b) => a - b);
-      const label = sorted.length === 1 ? `${sorted[0]}` : `[${sorted.join(', ')}]`;
+
+      // ----- Build label, inserting a line break when there are many items -----
+      let label;
+      let lines;
+      if (sorted.length === 1) {
+        label = `${sorted[0]}`;
+        lines = [label];
+      } else {
+        const items = sorted.map(String);
+        if (items.length > 2) {
+          const mid = Math.ceil(items.length / 2);
+          lines = [
+            `[${items.slice(0, mid).join(', ')}`,
+            ` ${items.slice(mid).join(', ')}]`,
+          ];
+          label = lines.join('\n');
+        } else {
+          label = `[${items.join(', ')}]`;
+          lines = [label];
+        }
+      }
+
       const offset = terminalCircleSize(Math.max(...ks)) / 2 + 8;
       let x = px + Math.cos(th) * offset;
       let y = py + Math.sin(th) * offset;
@@ -122,8 +143,11 @@ window.draw = function () {
       noStroke();
       fill(210, 210, 210, 220);
       textSize(12);
-      const w = textWidth(label);
-      const h = textAscent() + textDescent();
+
+      // Compute bounding box of multi-line label
+      const lineHeight = textAscent() + textDescent();
+      const w = Math.max(...lines.map(l => textWidth(l)));
+      const h = lineHeight * lines.length;
 
       if (sorted.length > 1) {
         // Ensure label stays outside the circle and partial lines
