@@ -1,6 +1,6 @@
 import { TAU } from '../../lib/spiralMath.js';
 import { PARTIALS, X_BASE, gains, PARTIAL_MAX, buildAudio, updateRouteForMode, stepSequenceIfDue, isPlaying, getMode } from './audio.js';
-import { buildUI, refreshPlayButton, updateGridUI, getShowCurve, getViewMode } from './ui.js';
+import { buildUI, refreshPlayButton, updateGridUI, getViewMode } from './ui.js';
 import { drawSpiralCurve, drawPartials, drawLabelBox, octaveColor, partialStrokeWeight, terminalCircleSize } from './drawing.js';
 
 // ---------- Setup ----------
@@ -29,8 +29,6 @@ window.draw = function () {
   background(11);
 
   const viewMode = getViewMode();
-  const showCurve = getShowCurve();
-
   if (viewMode === 'spiral') {
     // Spiral bounds: square occupying 80% of the smaller canvas dimension.
     const boundSide = 0.8 * Math.min(width, height);
@@ -47,7 +45,7 @@ window.draw = function () {
     push();
     translate(cx, cy);
 
-    if (s > 0 && showCurve) {
+    if (s > 0) {
       drawSpiralCurve(s);
     }
 
@@ -118,12 +116,34 @@ window.draw = function () {
       const sorted = ks.slice().sort((a, b) => a - b);
       const label = sorted.length === 1 ? `${sorted[0]}` : `[${sorted.join(', ')}]`;
       const offset = terminalCircleSize(Math.max(...ks)) / 2 + 8;
-      const x = px + Math.cos(th) * offset;
-      const y = py + Math.sin(th) * offset;
+      let x = px + Math.cos(th) * offset;
+      let y = py + Math.sin(th) * offset;
       push();
       noStroke();
       fill(210, 210, 210, 220);
       textSize(12);
+      const w = textWidth(label);
+      const h = textAscent() + textDescent();
+
+      if (sorted.length > 1) {
+        // Ensure label stays outside the circle and partial lines
+        const dist = Math.sqrt(x * x + y * y);
+        const minDist = circleR + w / 2 + 4;
+        if (dist < minDist) {
+          const extra = minDist - dist;
+          x += Math.cos(th) * extra;
+          y += Math.sin(th) * extra;
+        }
+
+        // Avoid colliding with the "Angle" label beneath the circle
+        const bottomBound = circleR - h / 2 - 8;
+        if (y > bottomBound) y = bottomBound;
+
+        // Keep list labels within the left half of the canvas
+        const rightBound = halfWidth / 2 - w / 2 - 8;
+        if (x > rightBound) x = rightBound;
+      }
+
       textAlign(CENTER, CENTER);
       text(label, x, y);
       pop();
