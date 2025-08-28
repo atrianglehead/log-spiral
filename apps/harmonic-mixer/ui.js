@@ -46,7 +46,7 @@ export function buildUI() {
     tabSpiral.removeClass('active');
   });
 
-  // Play group
+  // Play button with f₀ control
   playGroup = createDiv().addClass('group');
   playBtn = createButton('▶'); playBtn.addClass('play-btn'); playBtn.attribute('title', 'Play/Pause');
   playGroup.child(playBtn);
@@ -59,20 +59,20 @@ export function buildUI() {
     refreshPlayButton();
   });
 
-  // Global settings
-  groupGlobal = createDiv().addClass('group');
-
   const f0Row = createDiv().addClass('control-row');
   f0Row.child(makeLabel('f₀ (Hz):'));
   f0Slider = createSlider(80, 160, DEFAULT_F0, 1); f0Slider.addClass('slider');
   const f0Val = createSpan('').style('color', '#cfcfcf');
   f0Row.child(f0Slider); f0Row.child(f0Val);
-  groupGlobal.child(f0Row);
+  playGroup.child(f0Row);
   f0Slider.elt.addEventListener('input', () => {
     setF0(parseInt(f0Slider.value(), 10));
     f0Val.html(' ' + getF0() + ' Hz');
     updateGridUI();
   });
+
+  // Global settings
+  groupGlobal = createDiv().addClass('group');
 
   const masterRow = createDiv().addClass('control-row');
   masterRow.child(makeLabel('Master:'));
