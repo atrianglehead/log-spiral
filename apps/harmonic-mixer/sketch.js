@@ -85,11 +85,20 @@ function drawPartialLabel(px, py, label, k) {
   const boxW = textWidth('16') + PAD * 2;
   const boxH = TS + PAD * 2;
 
-  // Position label below the terminal point
+  // Offset label away from the radial line to avoid overlaps
   const circleR = terminalCircleSize(k) / 2;
-  const offsetY = circleR + 4 + boxH / 2;
-  const x = px;
-  const y = py + offsetY;
+  const radialOffset = circleR + 4;
+  const tangentialOffset = boxH / 2 + 4;
+
+  // Determine radial and tangential directions for the partial
+  const angle = Math.atan2(py, px);
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const tx = -uy;
+  const ty = ux;
+
+  const x = px + ux * radialOffset + tx * tangentialOffset;
+  const y = py + uy * radialOffset + ty * tangentialOffset;
 
   rectMode(CENTER);
   noStroke();
