@@ -150,9 +150,12 @@ window.draw = function () {
       const h = lineHeight * lines.length;
 
       if (sorted.length > 1) {
-        // Ensure label stays outside the circle and partial lines
+        // Ensure the label's bounding box stays outside the circle.
+        // Use the radius of a bounding circle (covers width & height)
+        // so labels like "[5, 10]" don't intersect the edge.
         const dist = Math.sqrt(x * x + y * y);
-        const minDist = circleR + w / 2 + 4;
+        const rLabel = Math.sqrt(w * w + h * h) / 2;
+        const minDist = circleR + rLabel + 4;
         if (dist < minDist) {
           const extra = minDist - dist;
           x += Math.cos(th) * extra;

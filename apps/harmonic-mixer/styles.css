@@ -80,6 +80,7 @@ canvas{
   padding: 4px 6px;
   border-radius: 10px;
   border:1px solid transparent;
+  flex-wrap: wrap;
 }
 .group:focus-within{
   border-color: #2d2d34;
@@ -93,7 +94,8 @@ canvas{
   margin-right: 2px;
   text-transform: uppercase;
 }
-.nowrap{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.control-row{ display:flex; align-items:center; gap:6px; flex-wrap:nowrap; white-space:nowrap; }
+.mode-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 
 .group span{ user-select:none; }
 .group .label{ font-weight:600; color: var(--muted); margin-right: 4px; }
@@ -231,7 +233,10 @@ select, .play-btn, .view-tab { font: inherit; }
   .vslider{ height: 10vh; width: 20px; }
   .title{ font-size:10px; }
 }
-@media (max-width: 380px){
-  .slider{ width:110px; }
+@media (max-width: 480px){
+  .slider{ width:100px; }
+}
+@media (max-width: 360px){
+  .slider{ width:80px; }
   .vslider{ height: 9vh; width: 18px; }
 }
