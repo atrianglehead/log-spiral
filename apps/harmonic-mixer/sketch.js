@@ -287,11 +287,14 @@ window.draw = function () {
     }
 
     pop();
-    drawLabelBox(cx, cy + circleR + 16, 'Angle');
+    drawLabelBox(cx, cy + circleR + 24, 'Angle');
 
     // ----- Right: lengths as vertical lines -----
     const baseY = cy + circleR;
     const colWidth = halfWidth / PARTIALS;
+
+    // Base line for lengths
+    stroke(50); strokeWeight(1); line(halfWidth, baseY, width, baseY);
 
     for (let i = PARTIALS - 1; i >= 0; i--) {
       const k = i + 1;
@@ -312,7 +315,7 @@ window.draw = function () {
       circle(x, yTop, terminalCircleSize(k));
     }
 
-    drawLabelBox(halfWidth + halfWidth / 2, baseY + 16, 'Length');
+    drawLabelBox(halfWidth + halfWidth / 2, baseY + 24, 'Length');
   }
 
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
@@ -419,7 +422,9 @@ function buildUI() {
     const k = i + 1;
     const col = createDiv().addClass('hcol');
     const label = createSpan('k=' + k);
+    const [rCol, gCol, bCol] = octaveColor(k);
     const v = createSlider(0, 100, Math.round((gains[i] / PARTIAL_MAX) * 100), 1); v.addClass('vslider');
+    v.style('--accent', `rgb(${rCol}, ${gCol}, ${bCol})`);
     const hz = createSpan('').addClass('hz');
     col.child(label); col.child(v); col.child(hz);
     grid.child(col);
