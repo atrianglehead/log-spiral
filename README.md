@@ -27,6 +27,7 @@ Highlights:
 - Sequence mode: step through partials one by one at a chosen tempo.
 - Audition a single partial while adjusting its slider.
 - Smooth gain transitions to avoid clicks.
+- Slider knobs match each partial's color for quick visual association.
 
 ## Getting Started
 1. Clone this repository.
