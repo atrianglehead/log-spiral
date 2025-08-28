@@ -75,6 +75,32 @@ function drawLabelBox(x, y, label) {
   pop();
 }
 
+function drawPartialLabel(px, py, label, k) {
+  push();
+  const PAD = 4;
+  const TS = 12;
+  textSize(TS);
+
+  // Uniform box sized for up to two-digit labels
+  const boxW = textWidth('16') + PAD * 2;
+  const boxH = TS + PAD * 2;
+
+  // Position label below the terminal point
+  const circleR = terminalCircleSize(k) / 2;
+  const offsetY = circleR + 4 + boxH / 2;
+  const x = px;
+  const y = py + offsetY;
+
+  rectMode(CENTER);
+  noStroke();
+  fill(20, 20, 25, 220);
+  rect(x, y, boxW, boxH, 4);
+  fill(210, 210, 210, 220);
+  textAlign(CENTER, CENTER);
+  text(label, x, y);
+  pop();
+}
+
 // ---------- State ----------
 let f0 = DEFAULT_F0;
 let gains = Array(PARTIALS).fill(0); gains[0] = 1 * PARTIAL_MAX;
@@ -238,10 +264,7 @@ window.draw = function () {
         noStroke();
         fill(rCol, gCol, bCol, alpha * 255);
         circle(px, py, terminalCircleSize(k));
-
-        fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
-        const off = 16;
-        text(`${k}`, px + off * Math.cos(th), py + off * Math.sin(th));
+        drawPartialLabel(px, py, `${k}`, k);
       }
     }
 
