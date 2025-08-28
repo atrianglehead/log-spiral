@@ -194,6 +194,66 @@ window.draw = function () {
     pop();
   }
 
+  else if (viewMode === 'components') {
+    // Circle bounds on the left half
+    const halfWidth = width / 2;
+    const cx = Math.floor(halfWidth / 2);
+    const cy = Math.floor(height / 2);
+    const circleSide = 0.8 * Math.min(halfWidth, height);
+    const circleR = circleSide / 2;
+
+    // Scale so that the largest harmonic length matches the circle radius
+    const finalUnscaledR = X_BASE * PARTIALS;
+    const s = finalUnscaledR > 0 ? (circleR / finalUnscaledR) : 0;
+
+    push();
+
+    // ----- Left: angles as radial lines -----
+    translate(cx, cy);
+    noFill(); stroke(50); strokeWeight(2); circle(0, 0, circleR * 2);
+
+    for (let i = 0; i < PARTIALS; i++) {
+      const k = i + 1;
+      const th = Math.log2(k) * TAU;
+
+      const g = gains[i];
+      const alpha = g / PARTIAL_MAX;
+      const col = color(220, 210, 140, 255 * alpha);
+
+      const px = circleR * Math.cos(th);
+      const py = circleR * Math.sin(th);
+
+      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+      line(0, 0, px, py);
+
+      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+      circle(px, py, 8);
+    }
+
+    pop();
+
+    // ----- Right: lengths as vertical lines -----
+    const baseY = cy + circleR;
+    const colWidth = halfWidth / PARTIALS;
+
+    for (let i = 0; i < PARTIALS; i++) {
+      const k = i + 1;
+      const len = (k * X_BASE) * s;
+      const x = halfWidth + colWidth * (i + 0.5);
+      const yTop = baseY - len;
+
+      const g = gains[i];
+      const alpha = g / PARTIAL_MAX;
+      const col = color(220, 210, 140, 255 * alpha);
+
+      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+      line(x, baseY, x, yTop);
+
+      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+      circle(x, yTop, 8);
+    }
+  }
+
   if (playing && mode === 'seq' && ctx) stepSequenceIfDue();
 };
 
