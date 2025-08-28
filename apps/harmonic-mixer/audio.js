@@ -236,6 +236,7 @@ export function updateRouteForMode() {
 
 // ----- Smooth Play/Pause -----
 export function smoothStartMix() {
+  ensureAudio();
   playing = true;
   const t = audioNow();
   setNow(masterGain.gain, 0);
@@ -256,6 +257,7 @@ export function smoothStartMix() {
 }
 
 export function smoothStartSequence() {
+  ensureAudio();
   playing = true;
   resetSequenceClock();
   const t = audioNow();
@@ -269,12 +271,15 @@ export function smoothStartSequence() {
 }
 
 export function smoothPauseAll() {
+  ensureAudio();
+  playing = false;
   const t = audioNow();
   applyCurve(masterGain.gain, masterGain.gain.value, 0, MASTER_FADE_MS, t);
   setTimeout(() => {
     const t2 = audioNow();
-    for (let i = 0; i < PARTIALS; i++) applyCurve(routeGains[i].gain, routeGains[i].gain.value, 0, RAMP_MS, t2);
-    playing = false;
+    for (let i = 0; i < PARTIALS; i++) {
+      applyCurve(routeGains[i].gain, routeGains[i].gain.value, 0, RAMP_MS, t2);
+    }
   }, MASTER_FADE_MS + 12);
 }
 
@@ -293,11 +298,13 @@ export function stepSequenceIfDue() {
 
   if (seqIndex >= PARTIALS) {
     const t = audioNow();
+    playing = false;
     applyCurve(masterGain.gain, masterGain.gain.value, 0, MASTER_FADE_MS, t);
     setTimeout(() => {
       const t2 = audioNow();
-      for (let i = 0; i < PARTIALS; i++) applyCurve(routeGains[i].gain, routeGains[i].gain.value, 0, RAMP_MS, t2);
-      playing = false;
+      for (let i = 0; i < PARTIALS; i++) {
+        applyCurve(routeGains[i].gain, routeGains[i].gain.value, 0, RAMP_MS, t2);
+      }
     }, MASTER_FADE_MS + 12);
     return;
   }

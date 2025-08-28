@@ -55,18 +55,14 @@ export function drawLabelBox(x, y, label) {
 
 export function drawPartialLabel(px, py, label, k) {
   push();
-  const PAD = 4;
   const TS = 12;
   textSize(TS);
 
-  // Uniform box sized for up to two-digit labels
-  const boxW = textWidth('16') + PAD * 2;
-  const boxH = TS + PAD * 2;
-
   // Offset label away from the radial line to avoid overlaps
   const circleR = terminalCircleSize(k) / 2;
-  const radialOffset = circleR + 4;
-  const tangentialOffset = boxH / 2 + 4;
+  const isPowerOfTwo = (k & (k - 1)) === 0;
+  const radialOffset = isPowerOfTwo ? 0 : circleR + 4;
+  const tangentialOffset = TS / 2 + 4;
 
   // Determine radial and tangential directions for the partial
   const angle = Math.atan2(py, px);
@@ -78,10 +74,7 @@ export function drawPartialLabel(px, py, label, k) {
   const x = px + ux * radialOffset + tx * tangentialOffset;
   const y = py + uy * radialOffset + ty * tangentialOffset;
 
-  rectMode(CENTER);
   noStroke();
-  fill(20, 20, 25, 220);
-  rect(x, y, boxW, boxH, 4);
   fill(210, 210, 210, 220);
   textAlign(CENTER, CENTER);
   text(label, x, y);
@@ -100,7 +93,7 @@ export function drawSpiralCurve(s) {
 }
 
 export function drawPartials(s) {
-  for (let i = 0; i < PARTIALS; i++) {
+  for (let i = PARTIALS - 1; i >= 0; i--) {
     const k = i + 1;
     const th = (Math.log2(k)) * TAU;
     const r = (k * X_BASE) * s;
