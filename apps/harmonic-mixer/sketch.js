@@ -150,17 +150,23 @@ window.draw = function () {
       const h = lineHeight * lines.length;
 
       if (sorted.length > 1) {
-        // Ensure the label's bounding box stays outside the circle.
-        // Use the radius of a bounding circle (covers width & height)
-        // so labels like "[5, 10]" don't intersect the edge.
-        const dist = Math.sqrt(x * x + y * y);
-        const rLabel = Math.sqrt(w * w + h * h) / 2;
-        const minDist = circleR + rLabel + 4;
-        if (dist < minDist) {
-          const extra = minDist - dist;
-          x += Math.cos(th) * extra;
-          y += Math.sin(th) * extra;
-        }
+        const ensureOutsideCircle = () => {
+          const corners = [
+            [x - w / 2, y - h / 2],
+            [x + w / 2, y - h / 2],
+            [x - w / 2, y + h / 2],
+            [x + w / 2, y + h / 2],
+          ];
+          const minCornerDist = Math.min(...corners.map(([cx, cy]) => Math.hypot(cx, cy)));
+          const minDist = circleR + 4;
+          if (minCornerDist < minDist) {
+            const extra = minDist - minCornerDist;
+            x += Math.cos(th) * extra;
+            y += Math.sin(th) * extra;
+          }
+        };
+
+        ensureOutsideCircle();
 
         // Avoid colliding with the "Angle" label beneath the circle
         const bottomBound = circleR - h / 2 - 8;
@@ -169,6 +175,9 @@ window.draw = function () {
         // Keep list labels within the left half of the canvas
         const rightBound = halfWidth / 2 - w / 2 - 8;
         if (x > rightBound) x = rightBound;
+
+        // Re-check after applying bounds
+        ensureOutsideCircle();
       }
 
       textAlign(CENTER, CENTER);
