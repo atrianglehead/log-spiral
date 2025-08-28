@@ -62,28 +62,31 @@ export function buildUI() {
   // Global settings
   groupGlobal = createDiv().addClass('group');
 
-  groupGlobal.child(makeLabel('f₀ (Hz):'));
+  const f0Row = createDiv().addClass('control-row');
+  f0Row.child(makeLabel('f₀ (Hz):'));
   f0Slider = createSlider(80, 160, DEFAULT_F0, 1); f0Slider.addClass('slider');
   const f0Val = createSpan('').style('color', '#cfcfcf');
-  groupGlobal.child(f0Slider); groupGlobal.child(f0Val);
+  f0Row.child(f0Slider); f0Row.child(f0Val);
+  groupGlobal.child(f0Row);
   f0Slider.elt.addEventListener('input', () => {
     setF0(parseInt(f0Slider.value(), 10));
     f0Val.html(' ' + getF0() + ' Hz');
     updateGridUI();
   });
 
-  groupGlobal.child(makeLabel('Master:'));
+  const masterRow = createDiv().addClass('control-row');
+  masterRow.child(makeLabel('Master:'));
   masterSlider = createSlider(0, 100, Math.round(DEFAULT_MASTER * 100), 1); masterSlider.addClass('slider');
   const mVal = createSpan('').style('color', '#cfcfcf');
-  groupGlobal.child(masterSlider); groupGlobal.child(mVal);
+  masterRow.child(masterSlider); masterRow.child(mVal);
+  groupGlobal.child(masterRow);
   masterSlider.elt.addEventListener('input', () => {
     setMasterUI(parseInt(masterSlider.value(), 10) / 100);
     updateMasterAutoScale();
     mVal.html(' ' + Math.round(masterSlider.value()) + '%');
   });
 
-
-  const modeRow = createDiv().addClass('nowrap');
+  const modeRow = createDiv().addClass('mode-row');
   const togetherLabel = createSpan('Play Together');
   const modeToggle = createDiv().addClass('mode-toggle');
   const modeKnob = createDiv().addClass('mode-knob');
@@ -106,7 +109,7 @@ export function buildUI() {
     updateModeToggle();
   });
 
-  tempoRow = createDiv().addClass('nowrap');
+  tempoRow = createDiv().addClass('control-row');
   tempoRow.child(makeLabel('Tempo:'));
   tempoSlider = createSlider(1, 12, DEFAULT_TEMPO, 1); tempoSlider.addClass('slider');
   const tVal = createSpan('').style('color', '#cfcfcf');
