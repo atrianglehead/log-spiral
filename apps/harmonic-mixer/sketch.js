@@ -424,7 +424,9 @@ function buildUI() {
     const label = createSpan('k=' + k);
     const [rCol, gCol, bCol] = octaveColor(k);
     const v = createSlider(0, 100, Math.round((gains[i] / PARTIAL_MAX) * 100), 1); v.addClass('vslider');
-    v.style('--accent', `rgb(${rCol}, ${gCol}, ${bCol})`);
+    const color = `rgb(${rCol}, ${gCol}, ${bCol})`;
+    v.elt.style.setProperty('--accent', color);
+    v.elt.style.setProperty('accent-color', color);
     const hz = createSpan('').addClass('hz');
     col.child(label); col.child(v); col.child(hz);
     grid.child(col);
