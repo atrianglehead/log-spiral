@@ -80,6 +80,7 @@ window.draw = function () {
 
     // ----- Left: angles as radial lines -----
     translate(cx, cy);
+    const angleLabelGroups = new Map();
     noFill(); stroke(50); strokeWeight(2); circle(0, 0, circleR * 2);
 
     for (let i = PARTIALS - 1; i >= 0; i--) {
@@ -100,7 +101,32 @@ window.draw = function () {
       noStroke();
       fill(rCol, gCol, bCol, alpha * 255);
       circle(px, py, terminalCircleSize(k));
+
+      if (g > 0) {
+        let odd = k;
+        while (odd % 2 === 0) odd /= 2;
+        const thNorm = Math.atan2(py, px);
+        if (angleLabelGroups.has(odd)) {
+          angleLabelGroups.get(odd).ks.push(k);
+        } else {
+          angleLabelGroups.set(odd, { th: thNorm, px, py, ks: [k] });
+        }
+      }
     }
+
+    angleLabelGroups.forEach(({ th, px, py, ks }) => {
+      const label = ks.length === 1 ? `${ks[0]}` : `[${ks.join(', ')}]`;
+      const offset = terminalCircleSize(ks[0]) / 2 + 8;
+      const x = px + Math.cos(th) * offset;
+      const y = py + Math.sin(th) * offset;
+      push();
+      noStroke();
+      fill(210, 210, 210, 220);
+      textSize(12);
+      textAlign(CENTER, CENTER);
+      text(label, x, y);
+      pop();
+    });
 
     pop();
     drawLabelBox(cx, cy + circleR + 24, 'Angle');
@@ -110,7 +136,7 @@ window.draw = function () {
     const colWidth = halfWidth / PARTIALS;
 
     // Base line for lengths
-    stroke(50); strokeWeight(1); line(halfWidth, baseY, width, baseY);
+    stroke(50); strokeWeight(3); line(halfWidth, baseY, width, baseY);
 
     for (let i = PARTIALS - 1; i >= 0; i--) {
       const k = i + 1;
@@ -129,6 +155,17 @@ window.draw = function () {
       noStroke();
       fill(rCol, gCol, bCol, alpha * 255);
       circle(x, yTop, terminalCircleSize(k));
+
+      if (g > 0) {
+        const offset = terminalCircleSize(k) / 2 + 4;
+        push();
+        noStroke();
+        fill(210, 210, 210, 220);
+        textSize(12);
+        textAlign(CENTER, BOTTOM);
+        text(`${k}`, x, yTop - offset);
+        pop();
+      }
     }
 
     drawLabelBox(halfWidth + halfWidth / 2, baseY + 24, 'Length');
