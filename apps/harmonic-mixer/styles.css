@@ -168,6 +168,7 @@ select, .play-btn, .view-tab { font: inherit; }
   background: linear-gradient(#2a2a31, #2a2a31) no-repeat center/5px 100%;
   border-radius: 10px;
   outline:none;
+  accent-color: var(--accent);
 }
 .vslider::-webkit-slider-thumb{
   -webkit-appearance: none;
