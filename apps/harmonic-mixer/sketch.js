@@ -115,8 +115,9 @@ window.draw = function () {
     }
 
     angleLabelGroups.forEach(({ th, px, py, ks }) => {
-      const label = ks.length === 1 ? `${ks[0]}` : `[${ks.join(', ')}]`;
-      const offset = terminalCircleSize(ks[0]) / 2 + 8;
+      const sorted = ks.slice().sort((a, b) => a - b);
+      const label = sorted.length === 1 ? `${sorted[0]}` : `[${sorted.join(', ')}]`;
+      const offset = terminalCircleSize(Math.max(...ks)) / 2 + 8;
       const x = px + Math.cos(th) * offset;
       const y = py + Math.sin(th) * offset;
       push();
