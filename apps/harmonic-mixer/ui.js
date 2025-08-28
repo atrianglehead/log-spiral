@@ -4,13 +4,11 @@ import { PARTIALS, DEFAULT_F0, DEFAULT_MASTER, DEFAULT_TEMPO, PARTIAL_MAX, gains
          updateRouteForMode, updateMasterAutoScale, isPlaying, getMode, getF0 } from './audio.js';
 import { octaveColor } from './drawing.js';
 
-export let showCurve = true;
 let viewMode = 'spiral';
-export const getShowCurve = () => showCurve;
 export const getViewMode = () => viewMode;
 
 let ui, tabContainer, tabSpiral, tabComponents, groupGlobal, groupGrid, playGroup;
-let f0Slider, masterSlider, curveCheckbox, tempoSlider, tempoRow, playBtn;
+let f0Slider, masterSlider, tempoSlider, tempoRow, playBtn;
 export const colSliders = [];
 const colHzLabels = [];
 
@@ -63,7 +61,6 @@ export function buildUI() {
 
   // Global settings
   groupGlobal = createDiv().addClass('group');
-  groupGlobal.child(createSpan('Global').addClass('title'));
 
   groupGlobal.child(makeLabel('f₀ (Hz):'));
   f0Slider = createSlider(80, 160, DEFAULT_F0, 1); f0Slider.addClass('slider');
@@ -85,11 +82,6 @@ export function buildUI() {
     mVal.html(' ' + Math.round(masterSlider.value()) + '%');
   });
 
-  groupGlobal.child(makeLabel('Spiral curve:'));
-  curveCheckbox = createCheckbox();
-  curveCheckbox.parent(groupGlobal);
-  curveCheckbox.checked(showCurve);
-  curveCheckbox.changed(() => { showCurve = curveCheckbox.checked(); });
 
   const modeRow = createDiv().addClass('nowrap');
   const togetherLabel = createSpan('Play Together');
