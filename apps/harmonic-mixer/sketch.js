@@ -23,6 +23,36 @@ const AUD_CLOSE_MS   = 80;   // audition close / monitor->mix
 
 const DEFAULT_TEMPO  = 4;    // steps/sec (sequence)
 
+// Octave colors: all partials within an octave share a color.
+// Colors cycle if the octave index exceeds the palette length.
+const OCTAVE_COLORS = [
+  [230, 120, 120],
+  [120, 230, 120],
+  [120, 120, 230],
+  [230, 230, 120],
+  [230, 120, 230],
+  [120, 230, 230],
+];
+
+// Base line widths: odd-numbered partials use ODD_WEIGHT.
+// Even-numbered partials are slightly wider than half their number.
+const ODD_WEIGHT = 2;
+const EVEN_DELTA = 0.5;
+
+function octaveColor(k) {
+  const idx = Math.floor(Math.log2(k)) % OCTAVE_COLORS.length;
+  return OCTAVE_COLORS[idx];
+}
+
+function partialStrokeWeight(k) {
+  let w = ODD_WEIGHT;
+  while (k % 2 === 0) {
+    w += EVEN_DELTA;
+    k /= 2;
+  }
+  return w;
+}
+
 // ---------- State ----------
 let f0 = DEFAULT_F0;
 let gains = Array(PARTIALS).fill(0); gains[0] = 1 * PARTIAL_MAX;
@@ -177,12 +207,14 @@ window.draw = function () {
 
         const g = gains[i];
         const alpha = g / PARTIAL_MAX;
-        const col = color(220, 210, 140, 255 * alpha);
+        const [rCol, gCol, bCol] = octaveColor(k);
 
-        stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+        stroke(rCol, gCol, bCol, alpha * 255);
+        strokeWeight(partialStrokeWeight(k));
         line(0, 0, px, py);
 
-        noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+        noStroke();
+        fill(rCol, gCol, bCol, alpha * 255);
         circle(px, py, 8);
 
         fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
@@ -218,15 +250,17 @@ window.draw = function () {
 
       const g = gains[i];
       const alpha = g / PARTIAL_MAX;
-      const col = color(220, 210, 140, 255 * alpha);
+      const [rCol, gCol, bCol] = octaveColor(k);
 
       const px = circleR * Math.cos(th);
       const py = circleR * Math.sin(th);
 
-      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+      stroke(rCol, gCol, bCol, alpha * 255);
+      strokeWeight(partialStrokeWeight(k));
       line(0, 0, px, py);
 
-      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+      noStroke();
+      fill(rCol, gCol, bCol, alpha * 255);
       circle(px, py, 8);
     }
 
@@ -244,12 +278,14 @@ window.draw = function () {
 
       const g = gains[i];
       const alpha = g / PARTIAL_MAX;
-      const col = color(220, 210, 140, 255 * alpha);
+      const [rCol, gCol, bCol] = octaveColor(k);
 
-      stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+      stroke(rCol, gCol, bCol, alpha * 255);
+      strokeWeight(partialStrokeWeight(k));
       line(x, baseY, x, yTop);
 
-      noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+      noStroke();
+      fill(rCol, gCol, bCol, alpha * 255);
       circle(x, yTop, 8);
     }
   }
@@ -642,12 +678,14 @@ function drawPartials(s) {
 
     const g = gains[i];
     const alpha = g / PARTIAL_MAX;
-    const col = color(220, 210, 140, 255 * alpha);
+    const [rCol, gCol, bCol] = octaveColor(k);
 
-    stroke(red(col), green(col), blue(col), alpha * 255); strokeWeight(2);
+    stroke(rCol, gCol, bCol, alpha * 255);
+    strokeWeight(partialStrokeWeight(k));
     line(0, 0, px, py);
 
-    noStroke(); fill(red(col), green(col), blue(col), alpha * 255);
+    noStroke();
+    fill(rCol, gCol, bCol, alpha * 255);
     circle(px, py, 8);
 
     fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
