@@ -53,6 +53,10 @@ function partialStrokeWeight(k) {
   return w;
 }
 
+function terminalCircleSize(k) {
+  return (k & (k - 1)) === 0 ? 8 : 6;
+}
+
 // ---------- State ----------
 let f0 = DEFAULT_F0;
 let gains = Array(PARTIALS).fill(0); gains[0] = 1 * PARTIAL_MAX;
@@ -198,7 +202,7 @@ window.draw = function () {
       line(0, -boundSide/2, 0, boundSide/2);
 
       // Partials
-      for (let i = 0; i < PARTIALS; i++) {
+      for (let i = PARTIALS - 1; i >= 0; i--) {
         const k = i + 1;
         const th = Math.log2(k) * TAU;
         const r  = (k * X_BASE) * s;
@@ -215,7 +219,7 @@ window.draw = function () {
 
         noStroke();
         fill(rCol, gCol, bCol, alpha * 255);
-        circle(px, py, 8);
+        circle(px, py, terminalCircleSize(k));
 
         fill(210, 210, 210, 220); textSize(12); textAlign(CENTER, CENTER);
         const off = 16;
@@ -244,7 +248,7 @@ window.draw = function () {
     translate(cx, cy);
     noFill(); stroke(50); strokeWeight(2); circle(0, 0, circleR * 2);
 
-    for (let i = 0; i < PARTIALS; i++) {
+    for (let i = PARTIALS - 1; i >= 0; i--) {
       const k = i + 1;
       const th = Math.log2(k) * TAU;
 
@@ -261,7 +265,7 @@ window.draw = function () {
 
       noStroke();
       fill(rCol, gCol, bCol, alpha * 255);
-      circle(px, py, 8);
+      circle(px, py, terminalCircleSize(k));
     }
 
     pop();
@@ -270,7 +274,7 @@ window.draw = function () {
     const baseY = cy + circleR;
     const colWidth = halfWidth / PARTIALS;
 
-    for (let i = 0; i < PARTIALS; i++) {
+    for (let i = PARTIALS - 1; i >= 0; i--) {
       const k = i + 1;
       const len = (k * X_BASE) * s;
       const x = halfWidth + colWidth * (i + 0.5);
@@ -286,7 +290,7 @@ window.draw = function () {
 
       noStroke();
       fill(rCol, gCol, bCol, alpha * 255);
-      circle(x, yTop, 8);
+      circle(x, yTop, terminalCircleSize(k));
     }
   }
 
