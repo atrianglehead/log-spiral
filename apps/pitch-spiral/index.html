@@ -13,6 +13,7 @@
     #topControls button{margin-right:0}
     #modeCtrl{display:flex;align-items:center;gap:4px}
     #topControls input[type=range]{width:100px}
+    #addSection{margin-bottom:8px;display:flex;align-items:center;gap:8px}
     .mode-toggle{width:40px;height:20px;border:1px solid #888;border-radius:10px;position:relative;cursor:pointer}
     .mode-toggle .mode-knob{position:absolute;top:1px;left:1px;width:18px;height:18px;border-radius:50%;background:#888;transition:left 0.2s}
     .mode-toggle.withf0 .mode-knob{left:21px}
@@ -32,8 +33,11 @@
           <div id="modeToggle" class="mode-toggle"><div class="mode-knob"></div></div>
           <span>With f0</span>
         </div>
-        <button id="add">+</button>
         <input id="volume" type="range" min="0" max="100" value="50" />
+      </div>
+      <div id="addSection">
+        <span>Add another Pitch</span>
+        <button id="add">+</button>
       </div>
       <div id="pitchList"></div>
     </div>
