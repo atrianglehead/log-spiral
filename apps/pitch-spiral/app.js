@@ -36,6 +36,7 @@ let activePitch = null; // pitch being auditioned via click/drag
 let currentOscs = [];   // oscillators for play button
 let tonicOsc = null, tonicGain = null; // oscillator for tonic slider
 let f0Osc = null, f0Gain = null; // oscillator for f0 during playback
+let lastDragged = null;
 
 function angleFor(p) { return p.baseAngle + p.detune * CENTS_TO_ANGLE; }
 function radiusFor(angle) { return innerR * Math.pow(2, angle / TAU); }
@@ -82,7 +83,16 @@ function draw() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  pitches.forEach(p => {
+  const sorted = [...pitches].sort((a,b) => angleFor(a) - angleFor(b));
+  if (lastDragged) {
+    const idx = sorted.indexOf(lastDragged);
+    if (idx !== -1) {
+      sorted.splice(idx,1);
+      sorted.push(lastDragged);
+    }
+  }
+
+  sorted.forEach(p => {
     const ang = angleFor(p);
     const r = radiusFor(ang);
     const x = r * Math.cos(ang);
@@ -165,7 +175,7 @@ function updateControls() {
       slider.addEventListener('pointerleave', end);
     }
     const rm = document.createElement('button');
-    rm.textContent = '-';
+    rm.textContent = '🗑️';
     rm.disabled = p.fixed;
     rm.addEventListener('click', () => removePitch(p.id));
     row.appendChild(label);
@@ -265,7 +275,6 @@ function startF0() {
   ramp(f0Gain.gain, NOTE_GAIN_F0, ctx.currentTime, FADE_MS);
   f0Osc.connect(f0Gain).connect(master);
   f0Osc.start();
-  currentOscs.push({osc:f0Osc, gain:f0Gain});
 }
 
 function stopF0() {
@@ -273,7 +282,6 @@ function stopF0() {
   const ctx = ensureAudio();
   ramp(f0Gain.gain, 0, ctx.currentTime, FADE_MS);
   f0Osc.stop(ctx.currentTime + FADE_MS / 1000);
-  currentOscs = currentOscs.filter(o => o.osc !== f0Osc);
   f0Osc = null;
   f0Gain = null;
 }
@@ -295,6 +303,7 @@ canvas.addEventListener('mousedown', e => {
         dragging = p;
         p.baseAngle = ang;
         p.detune = 0;
+        lastDragged = p;
         updateControls();
       }
       return;
@@ -357,8 +366,6 @@ function stopPlayback() {
   currentOscs = [];
   playing = false;
   playBtn.textContent = '▶';
-  f0Osc = null;
-  f0Gain = null;
 }
 
 async function startSequential() {
@@ -403,9 +410,7 @@ playBtn.addEventListener('click', () => {
 modeToggle.addEventListener('click', () => {
   playMode = playMode === 'withf0' ? 'nof0' : 'withf0';
   modeToggle.classList.toggle('withf0', playMode === 'withf0');
-  if (playing) {
-    if (playMode === 'withf0') startF0(); else stopF0();
-  }
+  if (playMode === 'withf0') startF0(); else stopF0();
 });
 
 addBtn.addEventListener('click', addPitch);
@@ -415,3 +420,4 @@ resize();
 updateControls();
 draw();
 modeToggle.classList.toggle('withf0', playMode === 'withf0');
+if (playMode === 'withf0') startF0();
