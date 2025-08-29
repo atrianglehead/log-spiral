@@ -2,7 +2,7 @@
 import { TAU, thetaForMultiple, radiusAt } from '../../lib/spiralMath.js';
 import { fitScale } from '../../lib/panelFit.js';
 import { state, getFinalAndMax, setX, resetSketch, restartAndPlay, MIN_SPEED, MAX_SPEED, margin } from './state.js';
-import { ensureAudio, playBeep, audioState } from './audio.js';
+import { ensureAudio, playBeep, audioState, MAX_AUDIBLE_FREQ } from './audio.js';
 import { ui, buildUI, refreshPlayPauseLabel, refreshVisualUI, refreshFilterUI, refreshRevealUI, refreshSpeedUI, refreshPitchUI, refreshVolumeUI, syncSpeedSlider } from './ui.js';
 import { getArea, drawGuide, computeMarkers, drawMarkers } from './drawing.js';
 
@@ -48,7 +48,7 @@ window.draw = function () {
 
     while (true) {
       const k = audioState.nextKToFire;
-      if (audioState.baseP * k > 20000) {
+      if (audioState.baseP * k > MAX_AUDIBLE_FREQ) {
         state.finished = true;
         state.paused = true;
         refreshPlayPauseLabel();
@@ -86,7 +86,7 @@ window.draw = function () {
   stroke(255, 160, 120); strokeWeight(3); line(0, 0, B.x, B.y);
 
   const allMarkers = computeMarkers(finalMultipleK, maxTheta);
-  const multiples = allMarkers.filter(m => (m.k % state.kFilter) === 0 && audioState.baseP * m.k <= 20000);
+  const multiples = allMarkers.filter(m => (m.k % state.kFilter) === 0 && audioState.baseP * m.k <= MAX_AUDIBLE_FREQ);
   const visible = (state.revealMode === 'progressive')
     ? multiples.filter(m => m.theta <= state.theta + 1e-9)
     : multiples;
@@ -102,8 +102,8 @@ window.draw = function () {
   const status = state.finished ? 'complete' : (state.paused ? 'paused' : 'running');
   const rDraw = (r_unscaled * s).toFixed(1);
   const finalDraw = (finalR_unscaled * s).toFixed(1);
-  const kMaxDueToAudio = Math.floor(20000 / audioState.baseP);
-  const maxFreqShown = Math.min(20000, audioState.baseP * (kMaxDueToAudio || 1));
+  const kMaxDueToAudio = Math.floor(MAX_AUDIBLE_FREQ / audioState.baseP);
+  const maxFreqShown = Math.min(MAX_AUDIBLE_FREQ, audioState.baseP * (kMaxDueToAudio || 1));
   text(
     `N=${state.rotations_N}  x=${state.x}px  r=${rDraw}px  final=${finalDraw}px  s=${s.toFixed(3)}  k=${state.kFilter}  ` +
     `reveal=${state.revealMode}  speed=${state.dTheta.toFixed(3)}  p=${audioState.baseP}Hz  vol=${audioState.volumePct}%  stop≤${maxFreqShown}Hz  status=${status}`,

@@ -1,7 +1,7 @@
 import { getSafeArea } from '../../lib/panelFit.js';
 import { TAU, thetaForMultiple } from '../../lib/spiralMath.js';
 import { state, margin, MARKER_CAP } from './state.js';
-import { audioState } from './audio.js';
+import { audioState, MAX_AUDIBLE_FREQ } from './audio.js';
 
 export function getArea(ui) {
   const canvasEl = document.querySelector('canvas');
@@ -46,7 +46,7 @@ export function computeMarkers(finalMultipleK, maxTheta) {
   const K = Math.min(finalMultipleK, MARKER_CAP);
   const arr = [];
   for (let k = 1; k <= K; k++) {
-    if (audioState.baseP * k > 20000) break;
+    if (audioState.baseP * k > MAX_AUDIBLE_FREQ) break;
     const th = thetaForMultiple(k);
     if (th > maxTheta + 1e-9) break;
     arr.push({ k, theta: th });

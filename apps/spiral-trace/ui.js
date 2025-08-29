@@ -1,5 +1,5 @@
 import { state, setRotations, restartAndPlay, getFinalAndMax, sliderToSpeed, speedToSlider, FILTER_LIST_MAX } from './state.js';
-import { ensureAudio, audioState, resetAudioProgress } from './audio.js';
+import { ensureAudio, audioState, resetAudioProgress, MAX_AUDIBLE_FREQ } from './audio.js';
 
 export let ui;
 export let groupVisual, groupAudio, groupPlay;
@@ -102,7 +102,7 @@ export function buildUI() {
     ensureAudio();
     audioState.baseP = parseInt(pSlider.value(), 10);
     updatePitchLabel();
-    if (audioState.baseP * audioState.nextKToFire > 20000) { state.finished = true; state.paused = true; refreshPlayPauseLabel(); }
+    if (audioState.baseP * audioState.nextKToFire > MAX_AUDIBLE_FREQ) { state.finished = true; state.paused = true; refreshPlayPauseLabel(); }
   });
 
   volSlider.elt.addEventListener('input', () => {
