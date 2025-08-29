@@ -8,7 +8,7 @@ const ctx = canvas.getContext('2d');
 const controls = document.getElementById('pitchList');
 const playBtn = document.getElementById('play');
 const addBtn = document.getElementById('add');
-const f0Slider = document.getElementById('f0vol');
+const f0Btn = document.getElementById('f0drone');
 const volumeSlider = document.getElementById('volume');
 
 let width, height, cx, cy, outerR, innerR;
@@ -20,6 +20,7 @@ const NOTE_GAIN_F0 = 0.2;
 
 let tonicHz = 110;
 let playing = false;
+let f0DroneOn = false;
 
 const master = makeMaster(0.5);
 volumeSlider.addEventListener('input', e => {
@@ -136,7 +137,6 @@ function updateControls() {
       p.muted = !p.muted;
       if (p._osc) stopPitchSound(p);
       updateControls();
-      updateDrone();
     });
     const solo = document.createElement('button');
     solo.textContent = 'S';
@@ -145,7 +145,6 @@ function updateControls() {
       p.solo = !p.solo;
       if (p._osc) stopPitchSound(p);
       updateControls();
-      updateDrone();
     });
     const label = document.createElement('span');
     label.innerHTML = `f<sub>${i}</sub>`;
@@ -217,7 +216,6 @@ function removePitch(id) {
     pitches.splice(idx,1);
     updateControls();
     draw();
-    updateDrone();
   }
 }
 
@@ -294,9 +292,7 @@ function stopPitchSound(p) {
 }
 
 function updateDrone() {
-  const lvl = parseInt(f0Slider.value,10) / 100;
-  const enabled = isPitchEnabled(pitches[0]) && lvl > 0;
-  if (enabled) {
+  if (f0DroneOn) {
     const ctx = ensureAudio();
     if (!f0Osc) {
       f0Osc = ctx.createOscillator();
@@ -307,7 +303,7 @@ function updateDrone() {
       f0Osc.connect(f0Gain).connect(master);
       f0Osc.start();
     }
-    ramp(f0Gain.gain, NOTE_GAIN_F0 * lvl, ctx.currentTime, FADE_MS);
+    ramp(f0Gain.gain, NOTE_GAIN_F0, ctx.currentTime, FADE_MS);
   } else if (f0Osc) {
     const ctx = ensureAudio();
     ramp(f0Gain.gain, 0, ctx.currentTime, FADE_MS);
@@ -438,7 +434,12 @@ playBtn.addEventListener('click', () => {
   }
 });
 
-f0Slider.addEventListener('input', updateDrone);
+f0Btn.addEventListener('click', () => {
+  f0DroneOn = !f0DroneOn;
+  f0Btn.classList.toggle('active', f0DroneOn);
+  f0Btn.innerHTML = `f<sub>0</sub> Drone ${f0DroneOn ? '🔊' : '🔇'}`;
+  updateDrone();
+});
 
 addBtn.addEventListener('click', addPitch);
 

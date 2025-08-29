@@ -11,6 +11,7 @@
     #controls{flex:1;background:#222;padding:8px;overflow:auto}
     #topControls{margin-bottom:8px;display:flex;align-items:center;gap:8px}
     #topControls button{margin-right:0}
+    #topControls button.active{background:#555}
     #topControls input[type=range]{width:100px}
     #addSection{margin-bottom:8px;display:flex;align-items:center;gap:8px}
     #pitchList{display:flex;flex-direction:column;gap:6px}
@@ -25,8 +26,8 @@
     <div id="controls">
       <div id="topControls">
         <button id="play">▶</button>
-        <span>f<sub>0</sub> drone</span>
-        <input id="f0vol" type="range" min="0" max="100" value="0" />
+        <button id="f0drone">f<sub>0</sub> Drone 🔇</button>
+        <span>🔊</span>
         <input id="volume" type="range" min="0" max="100" value="50" />
       </div>
       <div id="addSection">
