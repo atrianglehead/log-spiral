@@ -14,7 +14,7 @@ let width, height, cx, cy, outerR, innerR;
 const handleR = 8;
 
 let tonicHz = 110;
-let playMode = 'mix'; // 'mix' | 'seq'
+let playMode = 'seq'; // 'mix' | 'seq'
 let playing = false;
 
 const pitches = [
@@ -86,6 +86,12 @@ function draw() {
   ctx.restore();
 }
 
+function updatePitchControlColor(p) {
+  const color = colorFor(angleFor(p));
+  if (p._slider) p._slider.style.setProperty('accent-color', color);
+  if (p._label) p._label.style.color = color;
+}
+
 function updateControls() {
   const sorted = [...pitches].sort((a,b) => angleFor(a) - angleFor(b));
   controls.innerHTML = '';
@@ -93,11 +99,12 @@ function updateControls() {
     const row = document.createElement('div');
     row.className = 'pitch-control';
     const label = document.createElement('span');
-    label.innerHTML = `f<sub>${i*2}</sub>`;
+    label.innerHTML = `f<sub>${i}</sub>`;
     const slider = document.createElement('input');
     slider.type = 'range';
-    const color = colorFor(angleFor(p));
-    slider.style.setProperty('accent-color', color);
+    p._label = label;
+    p._slider = slider;
+    updatePitchControlColor(p);
     if (p.fixed) {
       slider.min = 80;
       slider.max = 160;
@@ -106,18 +113,18 @@ function updateControls() {
         tonicHz = parseFloat(e.target.value);
       });
     } else {
-      slider.min = -100; slider.max = 100; slider.value = p.detune;
+      slider.min = -50; slider.max = 50; slider.value = p.detune;
       slider.addEventListener('input', e => {
         p.detune = parseInt(e.target.value,10);
         if (activePitch === p) updatePitchSound(p);
         draw();
+        updatePitchControlColor(p);
       });
     }
     const rm = document.createElement('button');
     rm.textContent = '-';
     rm.disabled = p.fixed;
     rm.addEventListener('click', () => removePitch(p.id));
-    label.style.color = color;
     row.appendChild(label);
     row.appendChild(slider);
     row.appendChild(rm);
@@ -157,7 +164,7 @@ function startPitchSound(p) {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(frequencyFor(p), ctx.currentTime);
   gain.gain.setValueAtTime(0, ctx.currentTime);
-  ramp(gain.gain, 0.3, ctx.currentTime);
+  ramp(gain.gain, 0.3, ctx.currentTime, 80);
   osc.connect(gain).connect(ctx.destination);
   osc.start();
   p._osc = osc; p._gain = gain;
@@ -168,8 +175,8 @@ function updatePitchSound(p) {
 function stopPitchSound(p) {
   if (!p._osc) return;
   const ctx = ensureAudio();
-  ramp(p._gain.gain, 0, ctx.currentTime);
-  p._osc.stop(ctx.currentTime + 0.05);
+  ramp(p._gain.gain, 0, ctx.currentTime, 80);
+  p._osc.stop(ctx.currentTime + 0.08);
   p._osc = null; p._gain = null;
 }
 
@@ -217,6 +224,7 @@ canvas.addEventListener('mousemove', e => {
   dragging.baseAngle = ang;
   draw();
   updatePitchSound(dragging);
+  updatePitchControlColor(dragging);
 });
 
 function finalizeDrag() {
@@ -245,8 +253,8 @@ canvas.addEventListener('mouseleave', finalizeDrag);
 function stopPlayback() {
   currentOscs.forEach(({osc,gain}) => {
     const ctx = ensureAudio();
-    ramp(gain.gain, 0, ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.05);
+    ramp(gain.gain, 0, ctx.currentTime, 80);
+    osc.stop(ctx.currentTime + 0.08);
   });
   currentOscs = [];
   playing = false;
@@ -255,23 +263,26 @@ function stopPlayback() {
 
 async function startSequential() {
   const ctx = ensureAudio();
-  const sorted = [...pitches].sort((a,b)=>angleFor(a) - angleFor(b));
   const dur = 500; // ms per note
-  for (const p of sorted) {
-    if (!playing) break;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type='sine';
-    osc.frequency.setValueAtTime(frequencyFor(p), ctx.currentTime);
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    ramp(gain.gain,0.3,ctx.currentTime);
-    ramp(gain.gain,0,ctx.currentTime + (dur-50)/1000);
-    osc.stop(ctx.currentTime + dur/1000);
-    currentOscs=[{osc,gain}];
-    await new Promise(r=>setTimeout(r,dur));
-    currentOscs=[];
+  while (playing) {
+    const sorted = [...pitches].sort((a,b)=>angleFor(a) - angleFor(b));
+    for (const p of sorted) {
+      if (!playing) break;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type='sine';
+      osc.frequency.setValueAtTime(frequencyFor(p), ctx.currentTime);
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      ramp(gain.gain,0.3,ctx.currentTime,80);
+      ramp(gain.gain,0,ctx.currentTime + dur/1000 - 0.08,80);
+      osc.stop(ctx.currentTime + dur/1000);
+      currentOscs=[{osc,gain}];
+      await new Promise(r=>setTimeout(r,dur));
+      currentOscs=[];
+      if (!playing) break;
+    }
   }
   stopPlayback();
 }
@@ -288,8 +299,8 @@ function startTogether() {
     gain.gain.setValueAtTime(0, ctx.currentTime);
     osc.connect(gain).connect(ctx.destination);
     osc.start();
-    ramp(gain.gain,0.3,ctx.currentTime);
-    ramp(gain.gain,0,ctx.currentTime + (dur-50)/1000);
+    ramp(gain.gain,0.3,ctx.currentTime,80);
+    ramp(gain.gain,0,ctx.currentTime + dur/1000 - 0.08,80);
     osc.stop(ctx.currentTime + dur/1000);
     currentOscs.push({osc,gain});
   });
@@ -301,14 +312,14 @@ playBtn.addEventListener('click', () => {
     stopPlayback();
   } else {
     playing = true;
-    playBtn.textContent = '❚❚';
+    playBtn.textContent = '■';
     if (playMode === 'seq') startSequential(); else startTogether();
   }
 });
 
 modeToggle.addEventListener('click', () => {
   playMode = playMode === 'mix' ? 'seq' : 'mix';
-  modeToggle.classList.toggle('seq', playMode === 'seq');
+  modeToggle.classList.toggle('mix', playMode === 'mix');
 });
 
 addBtn.addEventListener('click', addPitch);
@@ -317,3 +328,4 @@ window.addEventListener('resize', resize);
 resize();
 updateControls();
 draw();
+modeToggle.classList.toggle('mix', playMode === 'mix');
