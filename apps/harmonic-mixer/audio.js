@@ -22,7 +22,10 @@ export const DEFAULT_TEMPO = 4;    // steps/sec (sequence)
 
 // ---------- State ----------
 let f0 = DEFAULT_F0;
-export let gains = Array(PARTIALS).fill(0); gains[0] = 1 * PARTIAL_MAX;
+export let gains = Array(PARTIALS).fill(0);
+gains[0] = 1 * PARTIAL_MAX;
+gains[1] = 0.5 * PARTIAL_MAX;
+gains[2] = 0.25 * PARTIAL_MAX;
 let masterUI = DEFAULT_MASTER;
 let mode = 'mix'; // 'mix' | 'seq'
 let playing = false;
@@ -32,7 +35,10 @@ let seqNextTime = 0;
 
 const auditioning = Array(PARTIALS).fill(false);
 const replacing   = Array(PARTIALS).fill(false);
-const uiValues    = Array(PARTIALS).fill(0); uiValues[0] = 1;
+const uiValues    = Array(PARTIALS).fill(0);
+uiValues[0] = 1;
+uiValues[1] = 0.5;
+uiValues[2] = 0.25;
 
 // Audio graph
 let ctx = null;
