@@ -8,7 +8,7 @@ const ctx = canvas.getContext('2d');
 const controls = document.getElementById('pitchList');
 const playBtn = document.getElementById('play');
 const addBtn = document.getElementById('add');
-const modeToggle = document.getElementById('modeToggle');
+const f0Slider = document.getElementById('f0vol');
 const volumeSlider = document.getElementById('volume');
 
 let width, height, cx, cy, outerR, innerR;
@@ -19,7 +19,6 @@ const NOTE_GAIN = 0.3;
 const NOTE_GAIN_F0 = 0.2;
 
 let tonicHz = 110;
-let playMode = 'nof0'; // 'nof0' | 'withf0'
 let playing = false;
 
 const master = makeMaster(0.5);
@@ -28,14 +27,14 @@ volumeSlider.addEventListener('input', e => {
 });
 
 const pitches = [
-  { id: 0, baseAngle: 0, detune: 0, fixed: true }
+  { id: 0, baseAngle: 0, detune: 0, fixed: true, muted:false, solo:false }
 ];
 let nextId = 1;
 let dragging = null;
 let activePitch = null; // pitch being auditioned via click/drag
 let currentOscs = [];   // oscillators for play button
 let tonicOsc = null, tonicGain = null; // oscillator for tonic slider
-let f0Osc = null, f0Gain = null; // oscillator for f0 during playback
+let f0Osc = null, f0Gain = null; // oscillator for f0 drone
 let lastDragged = null;
 
 function angleFor(p) { return p.baseAngle + p.detune * CENTS_TO_ANGLE; }
@@ -117,12 +116,37 @@ function updatePitchControlColor(p) {
   if (p._label) p._label.style.color = color;
 }
 
+function isPitchEnabled(p) {
+  if (p.muted) return false;
+  const soloActive = pitches.some(q => q.solo);
+  if (soloActive && !p.solo) return false;
+  return true;
+}
+
 function updateControls() {
   const sorted = [...pitches].sort((a,b) => angleFor(a) - angleFor(b));
   controls.innerHTML = '';
   sorted.forEach((p,i) => {
     const row = document.createElement('div');
     row.className = 'pitch-control';
+    const mute = document.createElement('button');
+    mute.textContent = 'M';
+    mute.classList.toggle('active', p.muted);
+    mute.addEventListener('click', () => {
+      p.muted = !p.muted;
+      if (p._osc) stopPitchSound(p);
+      updateControls();
+      updateDrone();
+    });
+    const solo = document.createElement('button');
+    solo.textContent = 'S';
+    solo.classList.toggle('active', p.solo);
+    solo.addEventListener('click', () => {
+      p.solo = !p.solo;
+      if (p._osc) stopPitchSound(p);
+      updateControls();
+      updateDrone();
+    });
     const label = document.createElement('span');
     label.innerHTML = `f<sub>${i}</sub>`;
     const slider = document.createElement('input');
@@ -175,9 +199,11 @@ function updateControls() {
       slider.addEventListener('pointerleave', end);
     }
     const rm = document.createElement('button');
-    rm.textContent = '🗑️';
+    rm.textContent = '🗑';
     rm.disabled = p.fixed;
     rm.addEventListener('click', () => removePitch(p.id));
+    row.appendChild(mute);
+    row.appendChild(solo);
     row.appendChild(label);
     row.appendChild(slider);
     row.appendChild(rm);
@@ -191,6 +217,7 @@ function removePitch(id) {
     pitches.splice(idx,1);
     updateControls();
     draw();
+    updateDrone();
   }
 }
 
@@ -205,12 +232,13 @@ function addPitch() {
   }
   let newAngle = (startAngle + endAngle) / 2;
   if (newAngle >= TAU) newAngle -= TAU;
-  pitches.push({ id: nextId++, baseAngle: newAngle, detune:0 });
+  pitches.push({ id: nextId++, baseAngle: newAngle, detune:0, muted:false, solo:false });
   updateControls();
   draw();
 }
 
 function startTonicSound() {
+  if (!isPitchEnabled(pitches[0])) return;
   const ctx = ensureAudio();
   tonicOsc = ctx.createOscillator();
   tonicGain = ctx.createGain();
@@ -242,6 +270,7 @@ function stopTonicSound() {
 }
 
 function startPitchSound(p) {
+  if (!isPitchEnabled(p)) return;
   const ctx = ensureAudio();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -264,28 +293,28 @@ function stopPitchSound(p) {
   p._osc = null; p._gain = null;
 }
 
-function startF0() {
-  if (!playing || f0Osc) return;
-  const ctx = ensureAudio();
-  f0Osc = ctx.createOscillator();
-  f0Gain = ctx.createGain();
-  f0Osc.type = 'triangle';
-  f0Osc.frequency.setValueAtTime(tonicHz, ctx.currentTime);
-  f0Gain.gain.setValueAtTime(0, ctx.currentTime);
-  ramp(f0Gain.gain, NOTE_GAIN_F0, ctx.currentTime, FADE_MS);
-  f0Osc.connect(f0Gain).connect(master);
-  f0Osc.start();
-  currentOscs.push({osc: f0Osc, gain: f0Gain});
-}
-
-function stopF0() {
-  if (!f0Osc) return;
-  const ctx = ensureAudio();
-  ramp(f0Gain.gain, 0, ctx.currentTime, FADE_MS);
-  f0Osc.stop(ctx.currentTime + FADE_MS / 1000);
-  currentOscs = currentOscs.filter(o => o.osc !== f0Osc);
-  f0Osc = null;
-  f0Gain = null;
+function updateDrone() {
+  const lvl = parseInt(f0Slider.value,10) / 100;
+  const enabled = isPitchEnabled(pitches[0]) && lvl > 0;
+  if (enabled) {
+    const ctx = ensureAudio();
+    if (!f0Osc) {
+      f0Osc = ctx.createOscillator();
+      f0Gain = ctx.createGain();
+      f0Osc.type = 'triangle';
+      f0Osc.frequency.setValueAtTime(tonicHz, ctx.currentTime);
+      f0Gain.gain.setValueAtTime(0, ctx.currentTime);
+      f0Osc.connect(f0Gain).connect(master);
+      f0Osc.start();
+    }
+    ramp(f0Gain.gain, NOTE_GAIN_F0 * lvl, ctx.currentTime, FADE_MS);
+  } else if (f0Osc) {
+    const ctx = ensureAudio();
+    ramp(f0Gain.gain, 0, ctx.currentTime, FADE_MS);
+    f0Osc.stop(ctx.currentTime + FADE_MS / 1000);
+    f0Osc = null;
+    f0Gain = null;
+  }
 }
 
 canvas.addEventListener('mousedown', e => {
@@ -360,7 +389,6 @@ canvas.addEventListener('mouseup', finalizeDrag);
 canvas.addEventListener('mouseleave', finalizeDrag);
 
 function stopPlayback() {
-  stopF0();
   currentOscs.forEach(({osc,gain}) => {
     const ctx = ensureAudio();
     ramp(gain.gain, 0, ctx.currentTime, FADE_MS);
@@ -376,8 +404,10 @@ async function startSequential() {
   const dur = 500; // ms per note
   while (playing) {
     const sorted = [...pitches].sort((a,b)=>angleFor(a) - angleFor(b));
+    const soloActive = pitches.some(p=>p.solo);
     for (const p of sorted) {
       if (!playing) break;
+      if (p.muted || (soloActive && !p.solo)) continue;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
@@ -385,8 +415,7 @@ async function startSequential() {
       gain.gain.setValueAtTime(0, ctx.currentTime);
       osc.connect(gain).connect(master);
       osc.start();
-      const lvl = playMode === 'withf0' ? NOTE_GAIN_F0 : NOTE_GAIN;
-      ramp(gain.gain, lvl, ctx.currentTime, FADE_MS);
+      ramp(gain.gain, NOTE_GAIN, ctx.currentTime, FADE_MS);
       ramp(gain.gain, 0, ctx.currentTime + dur/1000 - FADE_MS/1000, FADE_MS);
       osc.stop(ctx.currentTime + dur/1000);
       const obj = {osc, gain};
@@ -405,16 +434,11 @@ playBtn.addEventListener('click', () => {
   } else {
     playing = true;
     playBtn.textContent = '■';
-    if (playMode === 'withf0') startF0();
     startSequential();
   }
 });
 
-modeToggle.addEventListener('click', () => {
-  playMode = playMode === 'withf0' ? 'nof0' : 'withf0';
-  modeToggle.classList.toggle('withf0', playMode === 'withf0');
-  if (playing && playMode === 'withf0') startF0(); else stopF0();
-});
+f0Slider.addEventListener('input', updateDrone);
 
 addBtn.addEventListener('click', addPitch);
 
@@ -422,5 +446,5 @@ window.addEventListener('resize', resize);
 resize();
 updateControls();
 draw();
-modeToggle.classList.toggle('withf0', playMode === 'withf0');
+updateDrone();
 
