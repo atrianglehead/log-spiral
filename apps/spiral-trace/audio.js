@@ -1,5 +1,7 @@
 import { ensureAudio as ensureCoreAudio, makeMaster, playBeep as corePlayBeep } from '../../lib/audioCore.js';
 
+export const MAX_AUDIBLE_FREQ = 20000;
+
 export const audioState = {
   audioCtx: null,
   masterGain: null,

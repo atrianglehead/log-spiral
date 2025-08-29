@@ -1,5 +1,5 @@
 import { TAU, radiusAt } from '../../lib/spiralMath.js';
-import { resetAudioProgress } from './audio.js';
+import { resetAudioProgress, MAX_AUDIBLE_FREQ } from './audio.js';
 
 export const state = {
   x: 120,                  // base length (px) for fundamental radius
@@ -14,7 +14,7 @@ export const state = {
 };
 
 export const margin = 32;
-export const MARKER_CAP = 20000;
+export const MARKER_CAP = MAX_AUDIBLE_FREQ;
 export const FILTER_LIST_MAX = 500;
 
 export const MIN_SPEED = 0.002;
