@@ -42,7 +42,10 @@ function colorFor(angle) {
   const hue = ((angle / TAU * 360) % 360 + 360) % 360;
   return `hsl(${hue},100%,50%)`;
 }
-function frequencyFor(p) { return tonicHz * Math.pow(2, angleFor(p) / TAU); }
+function frequencyFor(p) {
+  const ang = ((angleFor(p) % TAU) + TAU) % TAU;
+  return tonicHz * Math.pow(2, ang / TAU);
+}
 
 function resize() {
   canvas.width = window.innerWidth;
@@ -132,28 +135,30 @@ function updateControls() {
       slider.addEventListener('pointerleave', end);
     } else {
       slider.min = -50; slider.max = 50; slider.value = p.detune;
+      let needsUpdate = false;
       const handleInput = e => {
         p.detune = parseInt(e.target.value,10);
         // snap across tonic when fine tuning
         let ang = angleFor(p);
-        let changed = false;
         if (ang < 0) {
           p.baseAngle += TAU;
           ang += TAU;
-          changed = true;
+          needsUpdate = true;
         } else if (ang >= TAU) {
           p.baseAngle -= TAU;
           ang -= TAU;
-          changed = true;
+          needsUpdate = true;
         }
-        if (changed) updateControls();
         draw();
         updatePitchControlColor(p);
         if (p._osc) updatePitchSound(p);
       };
       slider.addEventListener('input', handleInput);
       const start = () => { activePitch = p; startPitchSound(p); };
-      const end = () => { if (activePitch===p) { stopPitchSound(p); activePitch=null; } };
+      const end = () => {
+        if (activePitch===p) { stopPitchSound(p); activePitch=null; }
+        if (needsUpdate) { updateControls(); needsUpdate = false; }
+      };
       slider.addEventListener('pointerdown', start);
       slider.addEventListener('pointerup', end);
       slider.addEventListener('pointerleave', end);
@@ -284,7 +289,7 @@ canvas.addEventListener('mousemove', e => {
   const rect = canvas.getBoundingClientRect();
   let ang = Math.atan2(e.clientY - rect.top - cy, e.clientX - rect.left - cx);
   if (ang < 0) ang += TAU;
-  ang = Math.min(TAU, Math.max(0, ang));
+  if (ang >= TAU) ang -= TAU;
   dragging.baseAngle = ang;
   draw();
   updatePitchSound(dragging);
