@@ -1,4 +1,4 @@
-import { TAU } from '../../lib/spiralMath.js';
+import { radiusAt, thetaForMultiple } from '../../lib/spiralMath.js';
 import { PARTIALS, X_BASE, PARTIAL_MAX, gains } from './audio.js';
 
 // Octave colors: all partials within an octave share a color.
@@ -82,11 +82,11 @@ export function drawPartialLabel(px, py, label, k) {
 }
 
 export function drawSpiralCurve(s) {
-  const thetaMax = TAU * Math.log2(PARTIALS);
+  const thetaMax = thetaForMultiple(PARTIALS);
   noFill(); stroke(70); strokeWeight(2);
   beginShape();
   for (let th = 0; th <= thetaMax; th += 0.02) {
-    const r = X_BASE * Math.pow(2, th / TAU) * s;
+    const r = radiusAt(X_BASE, th) * s;
     vertex(r * Math.cos(th), r * Math.sin(th));
   }
   endShape();
@@ -95,8 +95,8 @@ export function drawSpiralCurve(s) {
 export function drawPartials(s) {
   for (let i = PARTIALS - 1; i >= 0; i--) {
     const k = i + 1;
-    const th = (Math.log2(k)) * TAU;
-    const r = (k * X_BASE) * s;
+    const th = thetaForMultiple(k);
+    const r = radiusAt(X_BASE, th) * s;
     const px = r * Math.cos(th);
     const py = r * Math.sin(th);
 
