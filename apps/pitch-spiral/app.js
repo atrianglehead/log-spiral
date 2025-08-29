@@ -1,4 +1,4 @@
-import { ensureAudio, ramp } from '../../lib/audioCore.js';
+import { ensureAudio, ramp, makeMaster } from '../../lib/audioCore.js';
 
 const TAU = Math.PI * 2;
 const CENTS_TO_ANGLE = TAU / 1200;
@@ -9,13 +9,22 @@ const controls = document.getElementById('pitchList');
 const playBtn = document.getElementById('play');
 const addBtn = document.getElementById('add');
 const modeToggle = document.getElementById('modeToggle');
+const volumeSlider = document.getElementById('volume');
 
 let width, height, cx, cy, outerR, innerR;
 const handleR = 8;
+const FADE_MS = 150;
+const NOTE_GAIN = 0.3;
+const NOTE_GAIN_F0 = 0.2;
 
 let tonicHz = 110;
-let playMode = 'seq'; // 'mix' | 'seq'
+let playMode = 'nof0'; // 'nof0' | 'withf0'
 let playing = false;
+
+const master = makeMaster(0.5);
+volumeSlider.addEventListener('input', e => {
+  master.gain.value = parseInt(e.target.value, 10) / 100;
+});
 
 const pitches = [
   { id: 0, baseAngle: 0, detune: 0, fixed: true }
@@ -28,7 +37,7 @@ let currentOscs = [];   // oscillators for play button
 function angleFor(p) { return p.baseAngle + p.detune * CENTS_TO_ANGLE; }
 function radiusFor(angle) { return innerR * Math.pow(2, angle / TAU); }
 function colorFor(angle) {
-  const hue = angle / TAU * 360;
+  const hue = ((angle / TAU * 360) % 360 + 360) % 360;
   return `hsl(${hue},100%,50%)`;
 }
 function frequencyFor(p) { return tonicHz * Math.pow(2, angleFor(p) / TAU); }
@@ -114,12 +123,18 @@ function updateControls() {
       });
     } else {
       slider.min = -50; slider.max = 50; slider.value = p.detune;
-      slider.addEventListener('input', e => {
+      const handleInput = e => {
         p.detune = parseInt(e.target.value,10);
-        if (activePitch === p) updatePitchSound(p);
         draw();
         updatePitchControlColor(p);
-      });
+        if (p._osc) updatePitchSound(p);
+      };
+      slider.addEventListener('input', handleInput);
+      const start = () => { activePitch = p; startPitchSound(p); };
+      const end = () => { if (activePitch===p) { stopPitchSound(p); activePitch=null; } };
+      slider.addEventListener('pointerdown', start);
+      slider.addEventListener('pointerup', end);
+      slider.addEventListener('pointerleave', end);
     }
     const rm = document.createElement('button');
     rm.textContent = '-';
@@ -161,11 +176,11 @@ function startPitchSound(p) {
   const ctx = ensureAudio();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.type = 'sine';
+  osc.type = 'triangle';
   osc.frequency.setValueAtTime(frequencyFor(p), ctx.currentTime);
   gain.gain.setValueAtTime(0, ctx.currentTime);
-  ramp(gain.gain, 0.3, ctx.currentTime, 80);
-  osc.connect(gain).connect(ctx.destination);
+  ramp(gain.gain, NOTE_GAIN, ctx.currentTime, FADE_MS);
+  osc.connect(gain).connect(master);
   osc.start();
   p._osc = osc; p._gain = gain;
 }
@@ -175,8 +190,8 @@ function updatePitchSound(p) {
 function stopPitchSound(p) {
   if (!p._osc) return;
   const ctx = ensureAudio();
-  ramp(p._gain.gain, 0, ctx.currentTime, 80);
-  p._osc.stop(ctx.currentTime + 0.08);
+  ramp(p._gain.gain, 0, ctx.currentTime, FADE_MS);
+  p._osc.stop(ctx.currentTime + FADE_MS / 1000);
   p._osc = null; p._gain = null;
 }
 
@@ -253,8 +268,8 @@ canvas.addEventListener('mouseleave', finalizeDrag);
 function stopPlayback() {
   currentOscs.forEach(({osc,gain}) => {
     const ctx = ensureAudio();
-    ramp(gain.gain, 0, ctx.currentTime, 80);
-    osc.stop(ctx.currentTime + 0.08);
+    ramp(gain.gain, 0, ctx.currentTime, FADE_MS);
+    osc.stop(ctx.currentTime + FADE_MS / 1000);
   });
   currentOscs = [];
   playing = false;
@@ -264,47 +279,40 @@ function stopPlayback() {
 async function startSequential() {
   const ctx = ensureAudio();
   const dur = 500; // ms per note
+  let f0Osc = null, f0Gain = null;
+  if (playMode === 'withf0') {
+    f0Osc = ctx.createOscillator();
+    f0Gain = ctx.createGain();
+    f0Osc.type = 'triangle';
+    f0Osc.frequency.setValueAtTime(tonicHz, ctx.currentTime);
+    f0Gain.gain.setValueAtTime(0, ctx.currentTime);
+    f0Osc.connect(f0Gain).connect(master);
+    f0Osc.start();
+    ramp(f0Gain.gain, NOTE_GAIN_F0, ctx.currentTime, FADE_MS);
+    currentOscs.push({osc:f0Osc, gain:f0Gain});
+  }
   while (playing) {
     const sorted = [...pitches].sort((a,b)=>angleFor(a) - angleFor(b));
     for (const p of sorted) {
       if (!playing) break;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type='sine';
+      osc.type='triangle';
       osc.frequency.setValueAtTime(frequencyFor(p), ctx.currentTime);
       gain.gain.setValueAtTime(0, ctx.currentTime);
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(master);
       osc.start();
-      ramp(gain.gain,0.3,ctx.currentTime,80);
-      ramp(gain.gain,0,ctx.currentTime + dur/1000 - 0.08,80);
+      const lvl = playMode === 'withf0' ? NOTE_GAIN_F0 : NOTE_GAIN;
+      ramp(gain.gain,lvl,ctx.currentTime,FADE_MS);
+      ramp(gain.gain,0,ctx.currentTime + dur/1000 - FADE_MS/1000,FADE_MS);
       osc.stop(ctx.currentTime + dur/1000);
-      currentOscs=[{osc,gain}];
+      currentOscs.push({osc,gain});
       await new Promise(r=>setTimeout(r,dur));
-      currentOscs=[];
+      currentOscs = playMode === 'withf0' ? [{osc:f0Osc,gain:f0Gain}] : [];
       if (!playing) break;
     }
   }
   stopPlayback();
-}
-
-function startTogether() {
-  const ctx = ensureAudio();
-  const sorted = [...pitches].sort((a,b)=>angleFor(a) - angleFor(b));
-  const dur = 1000;
-  sorted.forEach(p=>{
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type='sine';
-    osc.frequency.setValueAtTime(frequencyFor(p), ctx.currentTime);
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    ramp(gain.gain,0.3,ctx.currentTime,80);
-    ramp(gain.gain,0,ctx.currentTime + dur/1000 - 0.08,80);
-    osc.stop(ctx.currentTime + dur/1000);
-    currentOscs.push({osc,gain});
-  });
-  setTimeout(()=>{ if(playing) stopPlayback(); }, dur);
 }
 
 playBtn.addEventListener('click', () => {
@@ -313,13 +321,13 @@ playBtn.addEventListener('click', () => {
   } else {
     playing = true;
     playBtn.textContent = '■';
-    if (playMode === 'seq') startSequential(); else startTogether();
+    startSequential();
   }
 });
 
 modeToggle.addEventListener('click', () => {
-  playMode = playMode === 'mix' ? 'seq' : 'mix';
-  modeToggle.classList.toggle('mix', playMode === 'mix');
+  playMode = playMode === 'withf0' ? 'nof0' : 'withf0';
+  modeToggle.classList.toggle('withf0', playMode === 'withf0');
 });
 
 addBtn.addEventListener('click', addPitch);
@@ -328,4 +336,4 @@ window.addEventListener('resize', resize);
 resize();
 updateControls();
 draw();
-modeToggle.classList.toggle('mix', playMode === 'mix');
+modeToggle.classList.toggle('withf0', playMode === 'withf0');
