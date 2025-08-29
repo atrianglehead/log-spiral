@@ -366,6 +366,7 @@ function stopPlayback() {
   currentOscs = [];
   playing = false;
   playBtn.textContent = '▶';
+  stopF0();
 }
 
 async function startSequential() {
@@ -410,7 +411,7 @@ playBtn.addEventListener('click', () => {
 modeToggle.addEventListener('click', () => {
   playMode = playMode === 'withf0' ? 'nof0' : 'withf0';
   modeToggle.classList.toggle('withf0', playMode === 'withf0');
-  if (playMode === 'withf0') startF0(); else stopF0();
+  if (playing && playMode === 'withf0') startF0(); else stopF0();
 });
 
 addBtn.addEventListener('click', addPitch);
@@ -420,4 +421,4 @@ resize();
 updateControls();
 draw();
 modeToggle.classList.toggle('withf0', playMode === 'withf0');
-if (playMode === 'withf0') startF0();
+
