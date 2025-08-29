@@ -1,5 +1,5 @@
 import { getSafeArea } from '../../lib/panelFit.js';
-import { TAU, thetaForMultiple } from '../../lib/spiralMath.js';
+import { TAU, thetaForMultiple, radiusAt } from '../../lib/spiralMath.js';
 import { state, margin, MARKER_CAP } from './state.js';
 import { audioState, MAX_AUDIBLE_FREQ } from './audio.js';
 
@@ -59,7 +59,7 @@ export function drawMarkers(markers, s) {
   const showEvery = markers.length <= 80 ? 1 : Math.ceil(markers.length / 80);
   for (let i = 0; i < markers.length; i++) {
     const { k, theta } = markers[i];
-    const p = p5.Vector.fromAngle(theta, k * state.x * s);
+    const p = p5.Vector.fromAngle(theta, radiusAt(state.x, theta) * s); // r = x * 2^(θ/2π)
     noStroke(); fill(250, 210, 120); circle(p.x, p.y, 6);
     if (i % showEvery === 0) {
       fill(210);
