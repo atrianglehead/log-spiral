@@ -1,4 +1,4 @@
-import { TAU } from '../../lib/spiralMath.js';
+import { radiusAt, thetaForMultiple } from '../../lib/spiralMath.js';
 import { PARTIALS, X_BASE, gains, PARTIAL_MAX, buildAudio, updateRouteForMode, stepSequenceIfDue, isPlaying, getMode } from './audio.js';
 import { buildUI, refreshPlayButton, updateGridUI, getViewMode } from './ui.js';
 import { drawSpiralCurve, drawPartials, drawLabelBox, octaveColor, partialStrokeWeight, terminalCircleSize } from './drawing.js';
@@ -39,7 +39,7 @@ window.draw = function () {
     const cy = Math.floor(height / 2);
 
     // Compute scale so the OUTERMOST radius (k = PARTIALS) fits within the bounds
-    const finalUnscaledR  = X_BASE * PARTIALS; // outer radius before scaling
+    const finalUnscaledR  = radiusAt(X_BASE, thetaForMultiple(PARTIALS)); // outer radius before scaling
     const s = finalUnscaledR > 0 ? (maxRadiusPixels / finalUnscaledR) : 0;
 
     push();
@@ -71,7 +71,7 @@ window.draw = function () {
     const circleR = circleSide / 2;
 
     // Scale so that the largest harmonic length matches the circle radius
-    const finalUnscaledR = X_BASE * PARTIALS;
+    const finalUnscaledR = radiusAt(X_BASE, thetaForMultiple(PARTIALS));
     const s = finalUnscaledR > 0 ? (circleR / finalUnscaledR) : 0;
 
     push();
@@ -83,7 +83,7 @@ window.draw = function () {
 
     for (let i = PARTIALS - 1; i >= 0; i--) {
       const k = i + 1;
-      const th = Math.log2(k) * TAU;
+      const th = thetaForMultiple(k);
 
       const g = gains[i];
       const alpha = g / PARTIAL_MAX;
@@ -204,7 +204,7 @@ window.draw = function () {
 
     for (let i = PARTIALS - 1; i >= 0; i--) {
       const k = i + 1;
-      const len = (k * X_BASE) * s;
+      const len = radiusAt(X_BASE, thetaForMultiple(k)) * s;
       const x = halfWidth + colWidth * (i + 0.5);
       const yTop = baseY - len;
 
