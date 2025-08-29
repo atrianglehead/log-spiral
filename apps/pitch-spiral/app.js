@@ -265,7 +265,7 @@ function stopPitchSound(p) {
 }
 
 function startF0() {
-  if (f0Osc) return;
+  if (!playing || f0Osc) return;
   const ctx = ensureAudio();
   f0Osc = ctx.createOscillator();
   f0Gain = ctx.createGain();
@@ -275,6 +275,7 @@ function startF0() {
   ramp(f0Gain.gain, NOTE_GAIN_F0, ctx.currentTime, FADE_MS);
   f0Osc.connect(f0Gain).connect(master);
   f0Osc.start();
+  currentOscs.push({osc: f0Osc, gain: f0Gain});
 }
 
 function stopF0() {
@@ -282,6 +283,7 @@ function stopF0() {
   const ctx = ensureAudio();
   ramp(f0Gain.gain, 0, ctx.currentTime, FADE_MS);
   f0Osc.stop(ctx.currentTime + FADE_MS / 1000);
+  currentOscs = currentOscs.filter(o => o.osc !== f0Osc);
   f0Osc = null;
   f0Gain = null;
 }
@@ -358,6 +360,7 @@ canvas.addEventListener('mouseup', finalizeDrag);
 canvas.addEventListener('mouseleave', finalizeDrag);
 
 function stopPlayback() {
+  stopF0();
   currentOscs.forEach(({osc,gain}) => {
     const ctx = ensureAudio();
     ramp(gain.gain, 0, ctx.currentTime, FADE_MS);
@@ -366,7 +369,6 @@ function stopPlayback() {
   currentOscs = [];
   playing = false;
   playBtn.textContent = '▶';
-  stopF0();
 }
 
 async function startSequential() {
