@@ -13,7 +13,8 @@ const volumeSlider = document.getElementById('volume');
 
 let width, height, cx, cy, outerR, innerR;
 const handleR = 8;
-const FADE_MS = 150;
+// longer fade times for smoother starts/stops
+const FADE_MS = 300;
 const NOTE_GAIN = 0.3;
 const NOTE_GAIN_F0 = 0.2;
 
@@ -33,6 +34,7 @@ let nextId = 1;
 let dragging = null;
 let activePitch = null; // pitch being auditioned via click/drag
 let currentOscs = [];   // oscillators for play button
+let tonicOsc = null, tonicGain = null; // oscillator for tonic slider
 
 function angleFor(p) { return p.baseAngle + p.detune * CENTS_TO_ANGLE; }
 function radiusFor(angle) { return innerR * Math.pow(2, angle / TAU); }
@@ -118,13 +120,33 @@ function updateControls() {
       slider.min = 80;
       slider.max = 160;
       slider.value = tonicHz;
-      slider.addEventListener('input', e => {
+      const handleInput = e => {
         tonicHz = parseFloat(e.target.value);
-      });
+        updateTonicSound();
+      };
+      slider.addEventListener('input', handleInput);
+      const start = () => startTonicSound();
+      const end = () => stopTonicSound();
+      slider.addEventListener('pointerdown', start);
+      slider.addEventListener('pointerup', end);
+      slider.addEventListener('pointerleave', end);
     } else {
       slider.min = -50; slider.max = 50; slider.value = p.detune;
       const handleInput = e => {
         p.detune = parseInt(e.target.value,10);
+        // snap across tonic when fine tuning
+        let ang = angleFor(p);
+        let changed = false;
+        if (ang < 0) {
+          p.baseAngle += TAU;
+          ang += TAU;
+          changed = true;
+        } else if (ang >= TAU) {
+          p.baseAngle -= TAU;
+          ang -= TAU;
+          changed = true;
+        }
+        if (changed) updateControls();
         draw();
         updatePitchControlColor(p);
         if (p._osc) updatePitchSound(p);
@@ -170,6 +192,33 @@ function addPitch() {
   pitches.push({ id: nextId++, baseAngle: newAngle, detune:0 });
   updateControls();
   draw();
+}
+
+function startTonicSound() {
+  const ctx = ensureAudio();
+  tonicOsc = ctx.createOscillator();
+  tonicGain = ctx.createGain();
+  tonicOsc.type = 'triangle';
+  tonicOsc.frequency.setValueAtTime(tonicHz, ctx.currentTime);
+  tonicGain.gain.setValueAtTime(0, ctx.currentTime);
+  ramp(tonicGain.gain, NOTE_GAIN_F0, ctx.currentTime, FADE_MS);
+  tonicOsc.connect(tonicGain).connect(master);
+  tonicOsc.start();
+}
+
+function updateTonicSound() {
+  if (tonicOsc) {
+    tonicOsc.frequency.setValueAtTime(tonicHz, ensureAudio().currentTime);
+  }
+}
+
+function stopTonicSound() {
+  if (!tonicOsc) return;
+  const ctx = ensureAudio();
+  ramp(tonicGain.gain, 0, ctx.currentTime, FADE_MS);
+  tonicOsc.stop(ctx.currentTime + FADE_MS / 1000);
+  tonicOsc = null;
+  tonicGain = null;
 }
 
 function startPitchSound(p) {
