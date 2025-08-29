@@ -91,14 +91,21 @@ window.draw = function () {
 
       const px = circleR * Math.cos(th);
       const py = circleR * Math.sin(th);
+      const head = terminalCircleSize(k);
+      const lineX = px - Math.cos(th) * head;
+      const lineY = py - Math.sin(th) * head;
 
       stroke(rCol, gCol, bCol, alpha * 255);
       strokeWeight(partialStrokeWeight(k));
-      line(0, 0, px, py);
+      line(0, 0, lineX, lineY);
 
       noStroke();
       fill(rCol, gCol, bCol, alpha * 255);
-      circle(px, py, terminalCircleSize(k));
+      push();
+      translate(px, py);
+      rotate(th);
+      triangle(0, 0, -head, head * 0.6, -head, -head * 0.6);
+      pop();
 
       if (g > 0) {
         let odd = k;
