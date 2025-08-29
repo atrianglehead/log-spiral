@@ -11,14 +11,11 @@
     #controls{flex:1;background:#222;padding:8px;overflow:auto}
     #topControls{margin-bottom:8px;display:flex;align-items:center;gap:8px}
     #topControls button{margin-right:0}
-    #modeCtrl{display:flex;align-items:center;gap:4px}
     #topControls input[type=range]{width:100px}
     #addSection{margin-bottom:8px;display:flex;align-items:center;gap:8px}
-    .mode-toggle{width:40px;height:20px;border:1px solid #888;border-radius:10px;position:relative;cursor:pointer}
-    .mode-toggle .mode-knob{position:absolute;top:1px;left:1px;width:18px;height:18px;border-radius:50%;background:#888;transition:left 0.2s}
-    .mode-toggle.withf0 .mode-knob{left:21px}
     #pitchList{display:flex;flex-direction:column;gap:6px}
     .pitch-control{display:flex;align-items:center;gap:8px;border:1px solid #444;padding:4px;border-radius:4px;background:#333}
+    .pitch-control button.active{background:#555}
     .pitch-control input[type=range]{flex:1}
   </style>
 </head>
@@ -28,11 +25,8 @@
     <div id="controls">
       <div id="topControls">
         <button id="play">▶</button>
-        <div id="modeCtrl">
-          <span>Without f0</span>
-          <div id="modeToggle" class="mode-toggle"><div class="mode-knob"></div></div>
-          <span>With f0</span>
-        </div>
+        <span>f<sub>0</sub> drone</span>
+        <input id="f0vol" type="range" min="0" max="100" value="0" />
         <input id="volume" type="range" min="0" max="100" value="50" />
       </div>
       <div id="addSection">
