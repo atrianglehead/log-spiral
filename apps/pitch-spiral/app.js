@@ -4,6 +4,8 @@ const TAU = Math.PI * 2;
 const CENTS_TO_ANGLE = TAU / 1200;
 
 const canvas = document.getElementById('spiral');
+// allow custom gesture handling on touch devices
+canvas.style.touchAction = 'none';
 const ctx = canvas.getContext('2d');
 const controls = document.getElementById('pitchList');
 const playBtn = document.getElementById('play');
@@ -313,7 +315,8 @@ function updateDrone() {
   }
 }
 
-canvas.addEventListener('mousedown', e => {
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left - cx;
   const my = e.clientY - rect.top - cy;
@@ -347,10 +350,13 @@ canvas.addEventListener('mousedown', e => {
       }
     }
   }
+  // ensure we continue receiving events while dragging
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
 });
 
-canvas.addEventListener('mousemove', e => {
+canvas.addEventListener('pointermove', e => {
   if (!dragging) return;
+  e.preventDefault();
   const rect = canvas.getBoundingClientRect();
   let ang = Math.atan2(e.clientY - rect.top - cy, e.clientX - rect.left - cx);
   if (ang < 0) ang += TAU;
@@ -361,7 +367,7 @@ canvas.addEventListener('mousemove', e => {
   updatePitchControlColor(dragging);
 });
 
-function finalizeDrag() {
+function finalizeDrag(e) {
   if (dragging) {
     const p = dragging;
     dragging = null;
@@ -379,10 +385,15 @@ function finalizeDrag() {
     stopPitchSound(activePitch);
     activePitch = null;
   }
+  if (e && e.pointerId !== undefined) {
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
 }
 
-canvas.addEventListener('mouseup', finalizeDrag);
-canvas.addEventListener('mouseleave', finalizeDrag);
+canvas.addEventListener('pointerup', finalizeDrag);
+canvas.addEventListener('pointerleave', finalizeDrag);
+canvas.addEventListener('pointercancel', finalizeDrag);
+canvas.addEventListener('lostpointercapture', finalizeDrag);
 
 function stopPlayback() {
   currentOscs.forEach(({osc,gain}) => {
