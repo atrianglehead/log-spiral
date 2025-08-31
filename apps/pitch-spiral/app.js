@@ -192,10 +192,9 @@ function updateControls() {
         if (p._osc) updatePitchSound(p);
       };
       slider.addEventListener('input', handleInput);
-      const start = e => { e.preventDefault(); activePitch = p; startPitchSound(p); };
-      const end = e => {
-        if (e) e.preventDefault();
-        if (activePitch===p) { stopPitchSound(p); activePitch=null; }
+      const start = () => { activePitch = p; startPitchSound(p); };
+      const end = () => {
+        if (activePitch === p) { stopPitchSound(p); activePitch = null; }
         if (needsUpdate) { updateControls(); needsUpdate = false; }
       };
       slider.addEventListener('pointerdown', start);
