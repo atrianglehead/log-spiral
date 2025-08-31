@@ -16,7 +16,7 @@ const volumeSlider = document.getElementById('volume');
 let width, height, cx, cy, outerR, innerR;
 const handleR = 8;
 // longer fade times for smoother starts/stops
-const FADE_MS = 300;
+const FADE_MS = 500;
 const NOTE_GAIN = 0.3;
 const NOTE_GAIN_F0 = 0.2;
 
@@ -170,10 +170,10 @@ function updateControls() {
       slider.addEventListener('pointerup', end);
       slider.addEventListener('pointerleave', end);
     } else {
-      slider.min = -50; slider.max = 50; slider.value = p.detune;
+      slider.min = -25; slider.max = 25; slider.step = 0.5; slider.value = p.detune;
       let needsUpdate = false;
       const handleInput = e => {
-        p.detune = parseInt(e.target.value,10);
+        p.detune = parseFloat(e.target.value);
         // snap across tonic when fine tuning
         let ang = angleFor(p);
         if (ang < 0) {
@@ -199,15 +199,16 @@ function updateControls() {
       slider.addEventListener('pointerup', end);
       slider.addEventListener('pointerleave', end);
     }
-    const rm = document.createElement('button');
-    rm.textContent = '🗑';
-    rm.disabled = p.fixed;
-    rm.addEventListener('click', () => removePitch(p.id));
     row.appendChild(mute);
     row.appendChild(solo);
     row.appendChild(label);
     row.appendChild(slider);
-    row.appendChild(rm);
+    if (!p.fixed) {
+      const rm = document.createElement('button');
+      rm.textContent = '🗑';
+      rm.addEventListener('click', () => removePitch(p.id));
+      row.appendChild(rm);
+    }
     controls.appendChild(row);
   });
 }
