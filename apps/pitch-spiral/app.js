@@ -17,8 +17,8 @@ const volumeSlider = document.getElementById('volume');
 
 let width, height, cx, cy, outerR, innerR;
 const handleR = 8;
-// longer fade times for smoother starts/stops
-const FADE_MS = 500;
+// short fade for crisp, plucked sound
+const FADE_MS = 20;
 const NOTE_GAIN = 0.3;
 const NOTE_GAIN_F0 = 0.2;
 
