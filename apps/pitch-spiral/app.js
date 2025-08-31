@@ -6,6 +6,8 @@ const CENTS_TO_ANGLE = TAU / 1200;
 const canvas = document.getElementById('spiral');
 // allow custom gesture handling on touch devices
 canvas.style.touchAction = 'none';
+// suppress long-press context menu (prevents system click sounds)
+document.addEventListener('contextmenu', e => e.preventDefault());
 const ctx = canvas.getContext('2d');
 const controls = document.getElementById('pitchList');
 const playBtn = document.getElementById('play');
@@ -190,14 +192,16 @@ function updateControls() {
         if (p._osc) updatePitchSound(p);
       };
       slider.addEventListener('input', handleInput);
-      const start = () => { activePitch = p; startPitchSound(p); };
-      const end = () => {
+      const start = e => { e.preventDefault(); activePitch = p; startPitchSound(p); };
+      const end = e => {
+        if (e) e.preventDefault();
         if (activePitch===p) { stopPitchSound(p); activePitch=null; }
         if (needsUpdate) { updateControls(); needsUpdate = false; }
       };
       slider.addEventListener('pointerdown', start);
       slider.addEventListener('pointerup', end);
       slider.addEventListener('pointerleave', end);
+      slider.addEventListener('contextmenu', e => e.preventDefault());
     }
     row.appendChild(mute);
     row.appendChild(solo);
@@ -369,6 +373,7 @@ canvas.addEventListener('pointermove', e => {
 });
 
 function finalizeDrag(e) {
+  if (e) e.preventDefault();
   if (dragging) {
     const p = dragging;
     dragging = null;
