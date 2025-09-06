@@ -38,20 +38,28 @@ passes marked radii.
 * Filter markers to only show multiples of *k*.
 * Base pitch and master volume controls.
 
-### Harmonic Mixer
+### Pitch Harmonic Mixer
 Visualise and mix the first sixteen harmonics of a fundamental pitch.
 
 * Individual amplitude sliders for each partial.
 * Mix mode or step‑through sequence mode.
 * Audition a single partial while adjusting its slider.
 
+### Tempo Harmonic Mixer
+Build polyrhythms from tempo harmonics of a fundamental beat.
+
+* Individual volume sliders for each tempo.
+* Mix (polyrhythm) mode or step‑through sequence mode with adjustable beat count.
+* Fundamental tempo control between 20–40 BPM.
+
 ## Repository layout
 
 ```
-index.html           – landing page linking to each tool
-apps/spiral-trace/   – Spiral Trace application
-apps/harmonic-mixer/ – Harmonic Mixer application
-apps/pitch-spiral/   – Pitch Spiral application
+index.html                 – landing page linking to each tool
+apps/spiral-trace/         – Spiral Trace application
+apps/pitch-harmonic-mixer/ – Pitch Harmonic Mixer application
+apps/tempo-harmonic-mixer/ – Tempo Harmonic Mixer application
+apps/pitch-spiral/         – Pitch Spiral application
 lib/                 – shared ES modules (spiral math, panel fitting, audio helpers)
 LICENSE              – project license (GPLv3)
 ```
