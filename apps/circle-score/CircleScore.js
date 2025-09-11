@@ -4,6 +4,42 @@ import { getCanvasPos } from './eventUtils.js';
 
 const TAU = Math.PI * 2;
 
+function generateSegments(circle, startAngle = 0) {
+  const angles = circle.lines.slice().sort((a, b) => a - b);
+  const segments = [];
+  let current = startAngle;
+  if (angles.length === 0) {
+    segments.push({
+      from: current,
+      to: startAngle + TAU,
+      duration: 1000,
+      beep: false,
+    });
+    return segments;
+  }
+  let idx = angles.findIndex(a => a >= startAngle);
+  if (idx === -1) idx = 0;
+  for (let i = 0; i < angles.length; i++) {
+    const angle = angles[(idx + i) % angles.length];
+    const gap = (angle - current + TAU) % TAU;
+    segments.push({
+      from: current,
+      to: angle,
+      duration: (gap / TAU) * 1000,
+      beep: true,
+    });
+    current = angle;
+  }
+  const finalGap = (startAngle + TAU - current + TAU) % TAU;
+  segments.push({
+    from: current,
+    to: startAngle + TAU,
+    duration: (finalGap / TAU) * 1000,
+    beep: false,
+  });
+  return segments;
+}
+
 export class CircleScore {
   constructor(canvas, beatInput, playButton) {
     this.canvas = canvas;
@@ -234,28 +270,8 @@ export class CircleScore {
     this.playing = true;
     this.playCircleIdx = this.circles.indexOf(circle);
     const startAngle = angles[0];
-    let current = startAngle;
-    this.segments = [];
-    for (let i = 1; i < angles.length; i++) {
-      const angle = angles[i];
-      const gap = (angle - current + TAU) % TAU;
-      this.segments.push({
-        from: current,
-        to: angle,
-        duration: (gap / TAU) * 1000,
-        beep: true,
-      });
-      current = angle;
-    }
-    const finalGap = (startAngle + TAU - current + TAU) % TAU;
-    this.segments.push({
-      from: current,
-      to: startAngle + TAU,
-      duration: (finalGap / TAU) * 1000,
-      beep: false,
-    });
+    this.segments = generateSegments(circle, startAngle);
     this.segmentIdx = 0;
-    playBeep(880);
     this.startSegment();
   }
 
@@ -277,27 +293,7 @@ export class CircleScore {
   }
 
   buildSegments(circle) {
-    const angles = circle.lines.slice().sort((a, b) => a - b);
-    const segs = [];
-    let current = 0;
-    for (const angle of angles) {
-      const gap = (angle - current + TAU) % TAU;
-      segs.push({
-        from: current,
-        to: angle,
-        duration: (gap / TAU) * 1000,
-        beep: true,
-      });
-      current = angle;
-    }
-    const finalGap = (TAU - current + TAU) % TAU;
-    segs.push({
-      from: current,
-      to: TAU,
-      duration: (finalGap / TAU) * 1000,
-      beep: false,
-    });
-    return segs;
+    return generateSegments(circle);
   }
 
   startCircle(circle) {
