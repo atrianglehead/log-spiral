@@ -282,7 +282,9 @@ function startSegment() {
     if (playCircleIdx >= circles.length) {
       stopPlayback();
     } else {
-      playTimer = setTimeout(() => startCircle(circles[playCircleIdx]), 250);
+      // start next circle immediately with no gap
+      playTimer = null;
+      startCircle(circles[playCircleIdx]);
     }
     return;
   }
