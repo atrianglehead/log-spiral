@@ -180,15 +180,18 @@ canvas.addEventListener('pointerdown', e => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  const now = performance.now();
-  if (now - lastTap < 300 && Math.hypot(x - lastTapX, y - lastTapY) < 20) {
-    handleDoubleTap(x, y);
-    lastTap = 0;
-    return;
+  if (e.pointerType === 'touch') {
+    e.preventDefault();
+    const now = performance.now();
+    if (now - lastTap < 300 && Math.hypot(x - lastTapX, y - lastTapY) < 20) {
+      handleDoubleTap(x, y);
+      lastTap = 0;
+      return;
+    }
+    lastTap = now;
+    lastTapX = x;
+    lastTapY = y;
   }
-  lastTap = now;
-  lastTapX = x;
-  lastTapY = y;
   for (const c of circles) {
     const dx = x - c.x;
     const dy = y - c.y;
@@ -221,6 +224,14 @@ canvas.addEventListener('pointerdown', e => {
   selectedCircle = null;
   selectedLine = null;
   draw();
+});
+
+canvas.addEventListener('dblclick', e => {
+  ensureAudio();
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  handleDoubleTap(x, y);
 });
 
 canvas.addEventListener('pointermove', e => {
