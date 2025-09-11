@@ -8,6 +8,7 @@ document.addEventListener('contextmenu', e => e.preventDefault());
 const ctx = canvas.getContext('2d');
 const beatInput = document.getElementById('beatCount');
 const playButton = document.getElementById('play');
+const deleteButton = document.getElementById('delete');
 
 let width, height;
 
@@ -29,6 +30,10 @@ let segmentEndAngle = 0;
 let raf = null;
 const radius = 40;
 const spacing = radius * 2 + 8;
+
+let lastTap = 0;
+let lastTapX = 0;
+let lastTapY = 0;
 
 function resize() {
   width = canvas.clientWidth;
@@ -71,6 +76,8 @@ playButton.addEventListener('click', () => {
     startPlayback();
   }
 });
+
+deleteButton.addEventListener('click', deleteSelection);
 
 function addLine(circle) {
   if (circle.lines.length === 0) {
@@ -133,24 +140,24 @@ function draw() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Backspace') {
     e.preventDefault();
-    if (selectedLine) {
-      const { circle, index } = selectedLine;
-      circle.lines.splice(index, 1);
-      selectedLine = null;
-    } else if (selectedCircle) {
-      const idx = circles.indexOf(selectedCircle);
-      if (idx >= 0) circles.splice(idx, 1);
-      selectedCircle = null;
-    }
-    draw();
+    deleteSelection();
   }
 });
 
-canvas.addEventListener('click', e => {
-  if (e.detail !== 2) return;
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+function deleteSelection() {
+  if (selectedLine) {
+    const { circle, index } = selectedLine;
+    circle.lines.splice(index, 1);
+    selectedLine = null;
+  } else if (selectedCircle) {
+    const idx = circles.indexOf(selectedCircle);
+    if (idx >= 0) circles.splice(idx, 1);
+    selectedCircle = null;
+  }
+  draw();
+}
+
+function handleDoubleTap(x, y) {
   let hitCircle = null;
   for (const c of circles) {
     if (Math.hypot(c.x - x, c.y - y) <= c.r) {
@@ -166,18 +173,27 @@ canvas.addEventListener('click', e => {
     return;
   }
   createCircleAtNext();
-});
+}
 
-canvas.addEventListener('mousedown', e => {
+canvas.addEventListener('pointerdown', e => {
+  ensureAudio();
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
+  const now = performance.now();
+  if (now - lastTap < 300 && Math.hypot(x - lastTapX, y - lastTapY) < 20) {
+    handleDoubleTap(x, y);
+    lastTap = 0;
+    return;
+  }
+  lastTap = now;
+  lastTapX = x;
+  lastTapY = y;
   for (const c of circles) {
     const dx = x - c.x;
     const dy = y - c.y;
     const dist = Math.hypot(dx, dy);
     if (dist <= c.r) {
-      // audition if near center
       if (dist < 10) {
         selectedCircle = c;
         selectedLine = null;
@@ -207,7 +223,7 @@ canvas.addEventListener('mousedown', e => {
   draw();
 });
 
-canvas.addEventListener('mousemove', e => {
+canvas.addEventListener('pointermove', e => {
   if (!draggingLine) return;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -218,10 +234,11 @@ canvas.addEventListener('mousemove', e => {
   draw();
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('pointerup', () => {
   draggingLine = null;
   stopAudition();
 });
+
 
 function startAudition(circle) {
   ensureAudio();
