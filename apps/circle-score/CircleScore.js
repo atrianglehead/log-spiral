@@ -1,4 +1,5 @@
 import { playBeep, ensureAudio } from '../../lib/audioCore.js';
+import { drawCircle, drawPlayhead } from './renderer.js';
 
 const TAU = Math.PI * 2;
 
@@ -98,41 +99,15 @@ export class CircleScore {
   draw() {
     this.ctx.clearRect(0, 0, this.width, this.height);
     this.circles.forEach((c, idx) => {
-      this.ctx.lineWidth = c === this.selectedCircle ? 4 : 2;
-      this.ctx.strokeStyle = '#000';
-      this.ctx.beginPath();
-      this.ctx.arc(c.x, c.y, c.r, 0, TAU);
-      this.ctx.stroke();
-      c.lines.forEach((angle, i) => {
-        const sel =
-          this.selectedLine &&
-          this.selectedLine.circle === c &&
-          this.selectedLine.index === i;
-        this.ctx.lineWidth = sel ? 4 : 2;
-        this.ctx.beginPath();
-        this.ctx.moveTo(c.x, c.y);
-        this.ctx.lineTo(
-          c.x + c.r * Math.sin(angle),
-          c.y - c.r * Math.cos(angle)
-        );
-        this.ctx.stroke();
-      });
+      const selected = c === this.selectedCircle;
+      const selectedLineIndex =
+        this.selectedLine && this.selectedLine.circle === c
+          ? this.selectedLine.index
+          : null;
+      drawCircle(this.ctx, c, { selected, selectedLineIndex });
       if (this.playing && idx === this.playCircleIdx) {
-        this.ctx.strokeStyle = '#f00';
-        this.ctx.lineWidth = 2;
-        this.ctx.beginPath();
-        this.ctx.moveTo(c.x, c.y);
-        this.ctx.lineTo(
-          c.x + c.r * Math.sin(this.playheadAngle),
-          c.y - c.r * Math.cos(this.playheadAngle)
-        );
-        this.ctx.stroke();
+        drawPlayhead(this.ctx, c, this.playheadAngle);
       }
-      // center dot
-      this.ctx.fillStyle = '#000';
-      this.ctx.beginPath();
-      this.ctx.arc(c.x, c.y, 3, 0, TAU);
-      this.ctx.fill();
     });
   }
 
