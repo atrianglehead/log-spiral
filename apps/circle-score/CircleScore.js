@@ -1,7 +1,8 @@
-import { playBeep, ensureAudio } from '../../lib/audioCore.js';
+import { ensureAudio } from '../../lib/audioCore.js';
 import { drawCircle, drawPlayhead } from './renderer.js';
 import { getCanvasPos } from './eventUtils.js';
 import { Circle } from './Circle.js';
+import { Player } from './Player.js';
 
 const TAU = Math.PI * 2;
 
@@ -10,7 +11,6 @@ export class CircleScore {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.beatInput = beatInput;
-    this.playButton = playButton;
 
     this.canvas.style.touchAction = 'none';
 
@@ -21,18 +21,7 @@ export class CircleScore {
     this.selectedCircle = null;
     this.selectedLine = null; // {circle,index}
     this.draggingLine = null;
-    this.playTimer = null;
-    this.playing = false;
-    this.auditioning = false;
-    this.playCircleIdx = 0;
-    this.segments = [];
-    this.segmentIdx = 0;
-    this.playheadAngle = 0;
-    this.segmentStartTime = 0;
-    this.segmentDuration = 0;
-    this.segmentStartAngle = 0;
-    this.segmentEndAngle = 0;
-    this.raf = null;
+    this.player = new Player(() => this.draw(), playButton);
     this.radius = 40;
     this.spacing = this.radius * 2 + 8;
 
@@ -113,8 +102,8 @@ export class CircleScore {
           ? this.selectedLine.index
           : null;
       drawCircle(this.ctx, c, { selected, selectedLineIndex });
-      if (this.playing && idx === this.playCircleIdx) {
-        drawPlayhead(this.ctx, c, this.playheadAngle);
+      if (this.player.isPlaying() && c === this.player.currentCircle) {
+        drawPlayhead(this.ctx, c, this.player.playheadAngle);
       }
     });
   }
@@ -176,7 +165,7 @@ export class CircleScore {
         if (dist < 10) {
           this.selectedCircle = c;
           this.selectedLine = null;
-          this.startAudition(c);
+          this.player.startAudition(c);
           this.draw();
           return;
         }
@@ -221,7 +210,7 @@ export class CircleScore {
 
   onPointerUp() {
     this.draggingLine = null;
-    this.stopAudition();
+    this.player.stopAudition();
   }
 
   onKeyDown(e) {
@@ -235,111 +224,16 @@ export class CircleScore {
     e.preventDefault();
   }
 
-  startAudition(circle) {
-    this.stopAudition();
-    this.stopPlayback();
-    ensureAudio();
-    const angles = circle.lines.slice().sort((a, b) => a - b);
-    if (angles.length === 0) return;
-    this.auditioning = true;
-    this.playing = true;
-    this.playCircleIdx = this.circles.indexOf(circle);
-    const startAngle = angles[0];
-    this.segments = circle.generateSegments(startAngle);
-    this.segmentIdx = 0;
-    this.startSegment();
-  }
-
-  stopAudition() {
-    if (this.auditioning) {
-      this.auditioning = false;
-      this.stopPlayback();
-    }
-  }
-
   startPlayback() {
-    this.stopAudition();
-    ensureAudio();
-    if (this.circles.length === 0) return;
-    this.playing = true;
-    this.playButton.textContent = '⏸';
-    this.playCircleIdx = 0;
-    this.startCircle(this.circles[this.playCircleIdx]);
-  }
-
-  startCircle(circle) {
-    this.segments = circle.generateSegments();
-    this.segmentIdx = 0;
-    this.startSegment();
-  }
-
-  startSegment() {
-    if (!this.playing) return;
-    if (this.segmentIdx >= this.segments.length) {
-      if (this.auditioning) {
-        this.segmentIdx = 0;
-        playBeep(880);
-        this.startSegment();
-      } else {
-        this.playCircleIdx++;
-        if (this.playCircleIdx >= this.circles.length) {
-          this.stopPlayback();
-        } else {
-          this.playTimer = null;
-          this.startCircle(this.circles[this.playCircleIdx]);
-        }
-      }
-      return;
-    }
-    const seg = this.segments[this.segmentIdx];
-    this.segmentStartAngle = seg.from;
-    this.segmentEndAngle = seg.to;
-    this.segmentDuration = seg.duration;
-    this.segmentStartTime = performance.now();
-    this.animatePlayhead();
-    this.playTimer = setTimeout(() => {
-      if (seg.beep) playBeep(880);
-      this.segmentIdx++;
-      this.startSegment();
-    }, this.segmentDuration);
-  }
-
-  animatePlayhead() {
-    if (this.raf) cancelAnimationFrame(this.raf);
-    const step = () => {
-      if (!this.playing) return;
-      const now = performance.now();
-      const t = this.segmentDuration
-        ? Math.min((now - this.segmentStartTime) / this.segmentDuration, 1)
-        : 1;
-      const delta = (this.segmentEndAngle - this.segmentStartAngle + TAU) % TAU;
-      this.playheadAngle = this.segmentStartAngle + delta * t;
-      this.draw();
-      if (t < 1) {
-        this.raf = requestAnimationFrame(step);
-      } else {
-        this.raf = null;
-      }
-    };
-    step();
+    this.player.start(this.circles);
   }
 
   stopPlayback() {
-    this.playing = false;
-    this.playButton.textContent = '▶';
-    if (this.playTimer) {
-      clearTimeout(this.playTimer);
-      this.playTimer = null;
-    }
-    if (this.raf) {
-      cancelAnimationFrame(this.raf);
-      this.raf = null;
-    }
-    this.draw();
+    this.player.stop();
   }
 
   isPlaying() {
-    return this.playing;
+    return this.player.isPlaying();
   }
 }
 
