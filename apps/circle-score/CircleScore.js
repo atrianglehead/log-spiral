@@ -1,5 +1,6 @@
 import { playBeep, ensureAudio } from '../../lib/audioCore.js';
 import { drawCircle, drawPlayhead } from './renderer.js';
+import { getCanvasPos } from './eventUtils.js';
 
 const TAU = Math.PI * 2;
 
@@ -144,9 +145,7 @@ export class CircleScore {
 
   onPointerDown(e) {
     ensureAudio();
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = getCanvasPos(this.canvas, e);
     if (e.pointerType === 'touch') {
       e.preventDefault();
       const now = performance.now();
@@ -200,17 +199,13 @@ export class CircleScore {
 
   onDoubleClick(e) {
     ensureAudio();
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = getCanvasPos(this.canvas, e);
     this.handleDoubleTap(x, y);
   }
 
   onPointerMove(e) {
     if (!this.draggingLine) return;
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = getCanvasPos(this.canvas, e);
     const c = this.draggingLine.circle;
     const angle = (Math.atan2(x - c.x, -(y - c.y)) + TAU) % TAU;
     c.lines[this.draggingLine.index] = angle;
