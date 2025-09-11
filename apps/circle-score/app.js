@@ -16,9 +16,9 @@ const circles = [];
 let selectedCircle = null;
 let selectedLine = null; // {circle,index}
 let draggingLine = null;
-let auditionTimer = null;
 let playTimer = null;
 let playing = false;
+let auditioning = false;
 let playCircleIdx = 0;
 let segments = [];
 let segmentIdx = 0;
@@ -252,24 +252,34 @@ window.addEventListener('pointerup', () => {
 
 
 function startAudition(circle) {
+  stopAudition();
+  stopPlayback();
   ensureAudio();
   const angles = circle.lines.slice().sort((a, b) => a - b);
   if (angles.length === 0) return;
-  let idx = 0;
-  function tick() {
-    playBeep(880);
-    const next = (idx + 1) % angles.length;
-    const gap = (angles[next] - angles[idx] + TAU) % TAU;
-    idx = next;
-    auditionTimer = setTimeout(tick, gap / TAU * 1000);
+  auditioning = true;
+  playing = true;
+  playCircleIdx = circles.indexOf(circle);
+  const startAngle = angles[0];
+  let current = startAngle;
+  segments = [];
+  for (let i = 1; i < angles.length; i++) {
+    const angle = angles[i];
+    const gap = (angle - current + TAU) % TAU;
+    segments.push({ from: current, to: angle, duration: gap / TAU * 1000, beep: true });
+    current = angle;
   }
-  tick();
+  const finalGap = (startAngle + TAU - current + TAU) % TAU;
+  segments.push({ from: current, to: startAngle + TAU, duration: finalGap / TAU * 1000, beep: false });
+  segmentIdx = 0;
+  playBeep(880);
+  startSegment();
 }
 
 function stopAudition() {
-  if (auditionTimer) {
-    clearTimeout(auditionTimer);
-    auditionTimer = null;
+  if (auditioning) {
+    auditioning = false;
+    stopPlayback();
   }
 }
 
@@ -306,13 +316,19 @@ function startCircle(circle) {
 function startSegment() {
   if (!playing) return;
   if (segmentIdx >= segments.length) {
-    playCircleIdx++;
-    if (playCircleIdx >= circles.length) {
-      stopPlayback();
+    if (auditioning) {
+      segmentIdx = 0;
+      playBeep(880);
+      startSegment();
     } else {
-      // start next circle immediately with no gap
-      playTimer = null;
-      startCircle(circles[playCircleIdx]);
+      playCircleIdx++;
+      if (playCircleIdx >= circles.length) {
+        stopPlayback();
+      } else {
+        // start next circle immediately with no gap
+        playTimer = null;
+        startCircle(circles[playCircleIdx]);
+      }
     }
     return;
   }
