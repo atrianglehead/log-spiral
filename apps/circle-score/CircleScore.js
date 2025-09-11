@@ -1,44 +1,9 @@
 import { playBeep, ensureAudio } from '../../lib/audioCore.js';
 import { drawCircle, drawPlayhead } from './renderer.js';
 import { getCanvasPos } from './eventUtils.js';
+import { Circle } from './Circle.js';
 
 const TAU = Math.PI * 2;
-
-function generateSegments(circle, startAngle = 0) {
-  const angles = circle.lines.slice().sort((a, b) => a - b);
-  const segments = [];
-  let current = startAngle;
-  if (angles.length === 0) {
-    segments.push({
-      from: current,
-      to: startAngle + TAU,
-      duration: 1000,
-      beep: false,
-    });
-    return segments;
-  }
-  let idx = angles.findIndex(a => a >= startAngle);
-  if (idx === -1) idx = 0;
-  for (let i = 0; i < angles.length; i++) {
-    const angle = angles[(idx + i) % angles.length];
-    const gap = (angle - current + TAU) % TAU;
-    segments.push({
-      from: current,
-      to: angle,
-      duration: (gap / TAU) * 1000,
-      beep: true,
-    });
-    current = angle;
-  }
-  const finalGap = (startAngle + TAU - current + TAU) % TAU;
-  segments.push({
-    from: current,
-    to: startAngle + TAU,
-    duration: (finalGap / TAU) * 1000,
-    beep: false,
-  });
-  return segments;
-}
 
 export class CircleScore {
   constructor(canvas, beatInput, playButton) {
@@ -98,7 +63,7 @@ export class CircleScore {
       const step = TAU / beats;
       for (let i = 0; i < beats; i++) lines.push(i * step);
     }
-    const circle = { x, y, r: this.radius, lines };
+    const circle = new Circle(x, y, this.radius, lines);
     this.circles.push(circle);
     this.selectedCircle = circle;
     this.selectedLine = null;
@@ -111,26 +76,6 @@ export class CircleScore {
       : this.radius + 8;
     const y = this.height / 2;
     this.createCircle(x, y);
-  }
-
-  addLine(circle) {
-    if (circle.lines.length === 0) {
-      circle.lines.push(0);
-      return;
-    }
-    const angles = circle.lines.slice().sort((a, b) => a - b);
-    let maxGap = -1;
-    let insert = 0;
-    for (let i = 0; i < angles.length; i++) {
-      const a1 = angles[i];
-      const a2 = angles[(i + 1) % angles.length];
-      const gap = (a2 - a1 + TAU) % TAU;
-      if (gap > maxGap) {
-        maxGap = gap;
-        insert = (a1 + gap / 2) % TAU;
-      }
-    }
-    circle.lines.push(insert);
   }
 
   draw() {
@@ -151,7 +96,7 @@ export class CircleScore {
   deleteSelection() {
     if (this.selectedLine) {
       const { circle, index } = this.selectedLine;
-      circle.lines.splice(index, 1);
+      circle.removeLine(index);
       this.selectedLine = null;
     } else if (this.selectedCircle) {
       const idx = this.circles.indexOf(this.selectedCircle);
@@ -170,7 +115,7 @@ export class CircleScore {
       }
     }
     if (hitCircle) {
-      this.addLine(hitCircle);
+      hitCircle.addLine();
       this.selectedCircle = hitCircle;
       this.selectedLine = null;
       this.draw();
@@ -270,7 +215,7 @@ export class CircleScore {
     this.playing = true;
     this.playCircleIdx = this.circles.indexOf(circle);
     const startAngle = angles[0];
-    this.segments = generateSegments(circle, startAngle);
+    this.segments = circle.generateSegments(startAngle);
     this.segmentIdx = 0;
     this.startSegment();
   }
@@ -292,12 +237,8 @@ export class CircleScore {
     this.startCircle(this.circles[this.playCircleIdx]);
   }
 
-  buildSegments(circle) {
-    return generateSegments(circle);
-  }
-
   startCircle(circle) {
-    this.segments = this.buildSegments(circle);
+    this.segments = circle.generateSegments();
     this.segmentIdx = 0;
     this.startSegment();
   }
