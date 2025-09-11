@@ -160,11 +160,12 @@ canvas.addEventListener('mousedown', e => {
     const dy = y - c.y;
     const dist = Math.hypot(dx, dy);
     if (dist <= c.r) {
-      selectedCircle = c;
-      selectedLine = null;
       // audition if near center
       if (dist < 10) {
+        selectedCircle = c;
+        selectedLine = null;
         startAudition(c);
+        draw();
         return;
       }
       const ang = (Math.atan2(dx, -dy) + TAU) % TAU;
@@ -172,10 +173,14 @@ canvas.addEventListener('mousedown', e => {
         const diff = Math.abs(((c.lines[i] - ang + TAU + TAU / 2) % TAU) - TAU / 2);
         if (diff < 0.1) {
           selectedLine = { circle: c, index: i };
+          selectedCircle = null;
           draggingLine = selectedLine;
-          break;
+          draw();
+          return;
         }
       }
+      selectedCircle = c;
+      selectedLine = null;
       draw();
       return;
     }
