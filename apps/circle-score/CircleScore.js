@@ -1,4 +1,3 @@
-import { ensureAudio } from '../../lib/audioCore.js';
 import { drawCircle, drawPlayhead } from './renderer.js';
 import { getCanvasPos } from './eventUtils.js';
 import { Circle } from './Circle.js';
@@ -140,7 +139,6 @@ export class CircleScore {
   }
 
   onPointerDown(e) {
-    ensureAudio();
     const { x, y } = getCanvasPos(this.canvas, e);
     if (e.pointerType === 'touch') {
       e.preventDefault();
@@ -194,7 +192,6 @@ export class CircleScore {
   }
 
   onDoubleClick(e) {
-    ensureAudio();
     const { x, y } = getCanvasPos(this.canvas, e);
     this.handleDoubleTap(x, y);
   }
