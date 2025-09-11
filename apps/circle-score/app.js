@@ -9,6 +9,15 @@ const ctx = canvas.getContext('2d');
 const beatInput = document.getElementById('beatCount');
 
 let width, height;
+
+const circles = [];
+let selectedCircle = null;
+let selectedLine = null; // {circle,index}
+let draggingLine = null;
+let auditionTimer = null;
+const radius = 40;
+const spacing = radius * 2 + 8;
+
 function resize() {
   width = canvas.clientWidth;
   height = canvas.clientHeight;
@@ -18,13 +27,6 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
-
-const circles = [];
-let selectedCircle = null;
-let selectedLine = null; // {circle,index}
-let draggingLine = null;
-let auditionTimer = null;
-const radius = 40;
 
 function createCircle(x, y) {
   const beats = parseInt(beatInput.value, 10);
@@ -39,6 +41,16 @@ function createCircle(x, y) {
   selectedLine = null;
   draw();
 }
+
+function createCircleAtNext() {
+  const x = circles.length
+    ? circles[circles.length - 1].x + spacing
+    : radius + 8;
+  const y = height / 2;
+  createCircle(x, y);
+}
+
+createCircleAtNext();
 
 function addLine(circle) {
   if (circle.lines.length === 0) {
@@ -122,11 +134,7 @@ canvas.addEventListener('click', e => {
     draw();
     return;
   }
-  // check no overlap
-  for (const c of circles) {
-    if (Math.hypot(c.x - x, c.y - y) < c.r * 2 + 8) return;
-  }
-  createCircle(x, y);
+  createCircleAtNext();
 });
 
 canvas.addEventListener('mousedown', e => {
