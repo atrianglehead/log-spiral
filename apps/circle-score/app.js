@@ -19,8 +19,14 @@ let auditionTimer = null;
 let playTimer = null;
 let playing = false;
 let playCircleIdx = 0;
-let playLineIdx = 0;
-let playAngles = null;
+let segments = [];
+let segmentIdx = 0;
+let playheadAngle = 0;
+let segmentStartTime = 0;
+let segmentDuration = 0;
+let segmentStartAngle = 0;
+let segmentEndAngle = 0;
+let raf = null;
 const radius = 40;
 const spacing = radius * 2 + 8;
 
@@ -88,14 +94,14 @@ function addLine(circle) {
 
 function draw() {
   ctx.clearRect(0, 0, width, height);
-  circles.forEach(c => {
+  circles.forEach((c, idx) => {
     ctx.lineWidth = c === selectedCircle ? 4 : 2;
     ctx.strokeStyle = '#000';
     ctx.beginPath();
     ctx.arc(c.x, c.y, c.r, 0, TAU);
     ctx.stroke();
-    c.lines.forEach((angle, idx) => {
-      const sel = selectedLine && selectedLine.circle === c && selectedLine.index === idx;
+    c.lines.forEach((angle, i) => {
+      const sel = selectedLine && selectedLine.circle === c && selectedLine.index === i;
       ctx.lineWidth = sel ? 4 : 2;
       ctx.beginPath();
       ctx.moveTo(c.x, c.y);
@@ -105,6 +111,17 @@ function draw() {
       );
       ctx.stroke();
     });
+    if (playing && idx === playCircleIdx) {
+      ctx.strokeStyle = '#f00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(
+        c.x + c.r * Math.sin(playheadAngle),
+        c.y - c.r * Math.cos(playheadAngle)
+      );
+      ctx.stroke();
+    }
     // center dot
     ctx.fillStyle = '#000';
     ctx.beginPath();
@@ -235,35 +252,69 @@ function startPlayback() {
   playing = true;
   playButton.textContent = '⏸';
   playCircleIdx = 0;
-  scheduleNext(true);
+  startCircle(circles[playCircleIdx]);
 }
 
-function scheduleNext(first = false) {
-  if (!playing) return;
-  if (playCircleIdx >= circles.length) {
-    stopPlayback();
-    return;
-  }
-  const circle = circles[playCircleIdx];
+function buildSegments(circle) {
   const angles = circle.lines.slice().sort((a, b) => a - b);
-  if (angles.length === 0) {
+  const segs = [];
+  let current = 0;
+  for (const angle of angles) {
+    const gap = (angle - current + TAU) % TAU;
+    segs.push({ from: current, to: angle, duration: gap / TAU * 1000, beep: true });
+    current = angle;
+  }
+  const finalGap = (TAU - current + TAU) % TAU;
+  segs.push({ from: current, to: TAU, duration: finalGap / TAU * 1000, beep: false });
+  return segs;
+}
+
+function startCircle(circle) {
+  segments = buildSegments(circle);
+  segmentIdx = 0;
+  startSegment();
+}
+
+function startSegment() {
+  if (!playing) return;
+  if (segmentIdx >= segments.length) {
     playCircleIdx++;
-    scheduleNext(true);
+    if (playCircleIdx >= circles.length) {
+      stopPlayback();
+    } else {
+      playTimer = setTimeout(() => startCircle(circles[playCircleIdx]), 250);
+    }
     return;
   }
-  if (first) {
-    playAngles = angles;
-    playLineIdx = 0;
+  const seg = segments[segmentIdx];
+  segmentStartAngle = seg.from;
+  segmentEndAngle = seg.to;
+  segmentDuration = seg.duration;
+  segmentStartTime = performance.now();
+  animatePlayhead();
+  playTimer = setTimeout(() => {
+    if (seg.beep) playBeep(880);
+    segmentIdx++;
+    startSegment();
+  }, segmentDuration);
+}
+
+function animatePlayhead() {
+  if (raf) cancelAnimationFrame(raf);
+  function step() {
+    if (!playing) return;
+    const now = performance.now();
+    const t = segmentDuration ? Math.min((now - segmentStartTime) / segmentDuration, 1) : 1;
+    const delta = (segmentEndAngle - segmentStartAngle + TAU) % TAU;
+    playheadAngle = segmentStartAngle + delta * t;
+    draw();
+    if (t < 1) {
+      raf = requestAnimationFrame(step);
+    } else {
+      raf = null;
+    }
   }
-  playBeep(880);
-  playLineIdx++;
-  if (playLineIdx >= playAngles.length) {
-    playCircleIdx++;
-    playTimer = setTimeout(() => scheduleNext(true), 250);
-  } else {
-    const gap = (playAngles[playLineIdx] - playAngles[playLineIdx - 1] + TAU) % TAU;
-    playTimer = setTimeout(scheduleNext, (gap / TAU) * 1000);
-  }
+  step();
 }
 
 function stopPlayback() {
@@ -273,4 +324,9 @@ function stopPlayback() {
     clearTimeout(playTimer);
     playTimer = null;
   }
+  if (raf) {
+    cancelAnimationFrame(raf);
+    raf = null;
+  }
+  draw();
 }
