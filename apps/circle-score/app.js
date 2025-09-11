@@ -103,7 +103,8 @@ document.addEventListener('keydown', e => {
   }
 });
 
-canvas.addEventListener('dblclick', e => {
+canvas.addEventListener('click', e => {
+  if (e.detail !== 2) return;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
