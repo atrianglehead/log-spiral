@@ -13,7 +13,6 @@ export class CircleScore {
     this.playButton = playButton;
 
     this.canvas.style.touchAction = 'none';
-    document.addEventListener('contextmenu', e => e.preventDefault());
 
     this.width = 0;
     this.height = 0;
@@ -41,11 +40,38 @@ export class CircleScore {
     this.lastTapX = 0;
     this.lastTapY = 0;
 
-    this.resize = this.resize.bind(this);
-    window.addEventListener('resize', this.resize);
+    // Bind event handlers
+    this._boundResize = this.resize.bind(this);
+    this._boundPointerDown = this.onPointerDown.bind(this);
+    this._boundPointerMove = this.onPointerMove.bind(this);
+    this._boundPointerUp = this.onPointerUp.bind(this);
+    this._boundDoubleClick = this.onDoubleClick.bind(this);
+    this._boundKeyDown = this.onKeyDown.bind(this);
+    this._boundContextMenu = this.onContextMenu.bind(this);
+
     this.resize();
 
     this.createCircleAtNext();
+  }
+
+  bindEvents() {
+    window.addEventListener('resize', this._boundResize);
+    this.canvas.addEventListener('pointerdown', this._boundPointerDown);
+    this.canvas.addEventListener('pointermove', this._boundPointerMove);
+    window.addEventListener('pointerup', this._boundPointerUp);
+    this.canvas.addEventListener('dblclick', this._boundDoubleClick);
+    document.addEventListener('keydown', this._boundKeyDown);
+    document.addEventListener('contextmenu', this._boundContextMenu);
+  }
+
+  unbindEvents() {
+    window.removeEventListener('resize', this._boundResize);
+    this.canvas.removeEventListener('pointerdown', this._boundPointerDown);
+    this.canvas.removeEventListener('pointermove', this._boundPointerMove);
+    window.removeEventListener('pointerup', this._boundPointerUp);
+    this.canvas.removeEventListener('dblclick', this._boundDoubleClick);
+    document.removeEventListener('keydown', this._boundKeyDown);
+    document.removeEventListener('contextmenu', this._boundContextMenu);
   }
 
   resize() {
@@ -203,6 +229,10 @@ export class CircleScore {
       e.preventDefault();
       this.deleteSelection();
     }
+  }
+
+  onContextMenu(e) {
+    e.preventDefault();
   }
 
   startAudition(circle) {
