@@ -7,6 +7,7 @@ canvas.style.touchAction = 'none';
 document.addEventListener('contextmenu', e => e.preventDefault());
 const ctx = canvas.getContext('2d');
 const beatInput = document.getElementById('beatCount');
+const playButton = document.getElementById('play');
 
 let width, height;
 
@@ -15,6 +16,11 @@ let selectedCircle = null;
 let selectedLine = null; // {circle,index}
 let draggingLine = null;
 let auditionTimer = null;
+let playTimer = null;
+let playing = false;
+let playCircleIdx = 0;
+let playLineIdx = 0;
+let playAngles = null;
 const radius = 40;
 const spacing = radius * 2 + 8;
 
@@ -52,6 +58,14 @@ function createCircleAtNext() {
 
 createCircleAtNext();
 
+playButton.addEventListener('click', () => {
+  if (playing) {
+    stopPlayback();
+  } else {
+    startPlayback();
+  }
+});
+
 function addLine(circle) {
   if (circle.lines.length === 0) {
     circle.lines.push(0);
@@ -76,7 +90,7 @@ function draw() {
   ctx.clearRect(0, 0, width, height);
   circles.forEach(c => {
     ctx.lineWidth = c === selectedCircle ? 4 : 2;
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = '#000';
     ctx.beginPath();
     ctx.arc(c.x, c.y, c.r, 0, TAU);
     ctx.stroke();
@@ -92,7 +106,7 @@ function draw() {
       ctx.stroke();
     });
     // center dot
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = '#000';
     ctx.beginPath();
     ctx.arc(c.x, c.y, 3, 0, TAU);
     ctx.fill();
@@ -206,5 +220,52 @@ function stopAudition() {
   if (auditionTimer) {
     clearTimeout(auditionTimer);
     auditionTimer = null;
+  }
+}
+
+function startPlayback() {
+  stopAudition();
+  ensureAudio();
+  if (circles.length === 0) return;
+  playing = true;
+  playButton.textContent = '⏸';
+  playCircleIdx = 0;
+  scheduleNext(true);
+}
+
+function scheduleNext(first = false) {
+  if (!playing) return;
+  if (playCircleIdx >= circles.length) {
+    stopPlayback();
+    return;
+  }
+  const circle = circles[playCircleIdx];
+  const angles = circle.lines.slice().sort((a, b) => a - b);
+  if (angles.length === 0) {
+    playCircleIdx++;
+    scheduleNext(true);
+    return;
+  }
+  if (first) {
+    playAngles = angles;
+    playLineIdx = 0;
+  }
+  playBeep(880);
+  playLineIdx++;
+  if (playLineIdx >= playAngles.length) {
+    playCircleIdx++;
+    playTimer = setTimeout(() => scheduleNext(true), 250);
+  } else {
+    const gap = (playAngles[playLineIdx] - playAngles[playLineIdx - 1] + TAU) % TAU;
+    playTimer = setTimeout(scheduleNext, (gap / TAU) * 1000);
+  }
+}
+
+function stopPlayback() {
+  playing = false;
+  playButton.textContent = '▶';
+  if (playTimer) {
+    clearTimeout(playTimer);
+    playTimer = null;
   }
 }
