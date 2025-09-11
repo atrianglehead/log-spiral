@@ -40,6 +40,21 @@ export class Circle {
     this._assertSorted();
   }
 
+  updateLine(index, angle) {
+    // Remove the existing line
+    this.lines.splice(index, 1);
+    // Find new insertion index to keep lines sorted
+    const newIdx = this.lines.findIndex(a => a > angle);
+    if (newIdx === -1) {
+      this.lines.push(angle);
+      this._assertSorted();
+      return this.lines.length - 1;
+    }
+    this.lines.splice(newIdx, 0, angle);
+    this._assertSorted();
+    return newIdx;
+  }
+
   generateSegments(startAngle = 0) {
     this._assertSorted();
     const angles = this.lines;

@@ -204,7 +204,8 @@ export class CircleScore {
     const { x, y } = getCanvasPos(this.canvas, e);
     const c = this.draggingLine.circle;
     const angle = (Math.atan2(x - c.x, -(y - c.y)) + TAU) % TAU;
-    c.lines[this.draggingLine.index] = angle;
+    const newIdx = c.updateLine(this.draggingLine.index, angle);
+    this.draggingLine.index = newIdx;
     this.draw();
   }
 
