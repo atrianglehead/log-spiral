@@ -133,10 +133,11 @@ function updateControls() {
   controls.innerHTML = '';
   sorted.forEach((p,i) => {
     const row = document.createElement('div');
-    row.className = 'pitch-control';
+    row.className = 'flex items-center gap-2 border border-neutral-600 p-1 rounded bg-neutral-700';
     const mute = document.createElement('button');
     mute.textContent = 'M';
-    mute.classList.toggle('active', p.muted);
+    mute.className = 'bg-neutral-700 rounded px-2 py-1';
+    mute.classList.toggle('bg-neutral-600', p.muted);
     mute.addEventListener('click', () => {
       p.muted = !p.muted;
       if (p._osc) stopPitchSound(p);
@@ -144,7 +145,8 @@ function updateControls() {
     });
     const solo = document.createElement('button');
     solo.textContent = 'S';
-    solo.classList.toggle('active', p.solo);
+    solo.className = 'bg-neutral-700 rounded px-2 py-1';
+    solo.classList.toggle('bg-neutral-600', p.solo);
     solo.addEventListener('click', () => {
       p.solo = !p.solo;
       if (p._osc) stopPitchSound(p);
@@ -154,6 +156,7 @@ function updateControls() {
     label.innerHTML = `f<sub>${i}</sub>`;
     const slider = document.createElement('input');
     slider.type = 'range';
+    slider.className = 'flex-1';
     p._label = label;
     p._slider = slider;
     updatePitchControlColor(p);
@@ -209,6 +212,7 @@ function updateControls() {
     if (!p.fixed) {
       const rm = document.createElement('button');
       rm.textContent = '🗑';
+      rm.className = 'bg-neutral-700 rounded px-2 py-1';
       rm.addEventListener('click', () => removePitch(p.id));
       row.appendChild(rm);
     }
@@ -452,7 +456,7 @@ playBtn.addEventListener('click', () => {
 
 f0Btn.addEventListener('click', () => {
   f0DroneOn = !f0DroneOn;
-  f0Btn.classList.toggle('active', f0DroneOn);
+  f0Btn.classList.toggle('bg-neutral-600', f0DroneOn);
   f0Btn.innerHTML = `f<sub>0</sub> Drone ${f0DroneOn ? '🔊' : '🔇'}`;
   updateDrone();
 });
