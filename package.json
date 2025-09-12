@@ -1,0 +1,17 @@
+{
+  "name": "log-spiral",
+  "version": "1.0.0",
+  "description": "Log Spiral Tools is a collection of tiny, dependency‑free web sketches that connect the geometry of the logarithmic spiral with sound.  Each application runs entirely in the browser; simply open the HTML file and start experimenting.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
