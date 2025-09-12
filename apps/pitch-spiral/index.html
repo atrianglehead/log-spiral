@@ -7,22 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="h-full m-0 bg-neutral-900 text-neutral-100 font-sans">
-  <div id="app" class="h-full flex flex-col">
-    <canvas id="spiral" class="flex-[3] block bg-black"></canvas>
-    <div id="controls" class="flex-1 bg-neutral-800 p-2 overflow-auto">
-      <div id="topControls" class="mb-2 flex flex-wrap items-center gap-2">
-        <button id="play" class="bg-neutral-700 rounded px-2 py-1">▶</button>
-        <button id="f0drone" class="bg-neutral-700 rounded px-2 py-1">f<sub>0</sub> Drone 🔇</button>
-        <span>🔊</span>
-        <input id="volume" class="w-24" type="range" min="0" max="100" value="50" />
-      </div>
-      <div id="addSection" class="mb-2 flex items-center gap-2">
-        <span>Add another Pitch</span>
-        <button id="add" class="bg-neutral-700 rounded px-2 py-1">+</button>
-      </div>
-      <div id="pitchList" class="flex flex-col gap-1.5"></div>
-    </div>
-  </div>
+  <div id="app" class="h-full"></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>
