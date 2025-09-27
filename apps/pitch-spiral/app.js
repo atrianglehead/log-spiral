@@ -274,6 +274,7 @@ function stopTonicSound() {
 }
 
 function startPitchSound(p) {
+  if (playing) return;
   if (!isPitchEnabled(p)) return;
   const ctx = ensureAudio();
   const osc = ctx.createOscillator();
