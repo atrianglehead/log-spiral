@@ -371,30 +371,34 @@ function drawQuadrantShape(name, config, elapsed) {
 function drawQuadrantLabel(name, quadrant) {
   const label = name.toUpperCase();
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
-  const stripWidth = Math.max(24, width * 0.12);
+  const isLeft = quadrant.includes('left');
+  const letterCount = Math.max(1, label.length);
+  const verticalPadding = height * 0.12;
+  const availableHeight = Math.max(0, height - verticalPadding * 2);
+  const spacing = letterCount === 1 ? 0 : availableHeight / (letterCount - 1);
 
   ctx.save();
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-  ctx.fillRect(offsetX, offsetY, stripWidth, height);
-
-  ctx.strokeStyle = '#1f1f1f';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(offsetX + stripWidth, offsetY);
-  ctx.lineTo(offsetX + stripWidth, offsetY + height);
-  ctx.stroke();
-
   ctx.fillStyle = getSegmentColor(name);
-  const fontSize = Math.min(stripWidth * 0.7, (height / label.length) * 0.9);
-  ctx.font = `bold ${fontSize}px "Futura", "Helvetica Neue", Arial, sans-serif`;
-  ctx.textAlign = 'center';
+
+  const maxLetterHeight = availableHeight / letterCount;
+  const baseFontSize = isLeft
+    ? Math.min(width * 0.035, height * 0.045)
+    : Math.min(width * 0.06, height * 0.08);
+  const fontSize = Math.min(baseFontSize, maxLetterHeight * 0.7 || baseFontSize);
+  ctx.font = `600 ${fontSize}px "Futura", "Helvetica Neue", Arial, sans-serif`;
+  ctx.textAlign = isLeft ? 'left' : 'right';
   ctx.textBaseline = 'middle';
 
-  const textX = offsetX + stripWidth / 2;
-  const spacing = height / (label.length + 1);
-  for (let i = 0; i < label.length; i += 1) {
-    const textY = offsetY + spacing * (i + 1);
-    ctx.fillText(label[i], textX, textY);
+  const horizontalPadding = isLeft ? width * 0.06 : width * 0.08;
+  const textX = isLeft
+    ? offsetX + horizontalPadding
+    : offsetX + width - horizontalPadding;
+
+  for (let i = 0; i < letterCount; i += 1) {
+    const y = letterCount === 1
+      ? offsetY + height / 2
+      : offsetY + verticalPadding + spacing * i;
+    ctx.fillText(label[i], textX, y);
   }
 
   ctx.restore();
