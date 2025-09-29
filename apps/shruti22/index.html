@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Shruti22 — Log Spiral</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html,body,#app{height:100%;margin:0;background:#111;color:#eee;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    #app{display:flex;flex-direction:column}
+    canvas{flex:3;display:block;background:#000}
+    #controls{flex:1;background:#222;padding:8px;overflow:auto}
+    #topControls{margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    #topControls button{margin-right:0}
+    #topControls button.active{background:#555}
+    #topControls input[type=range]{width:120px}
+    #addSection{margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    #pitchList{display:flex;flex-direction:column;gap:6px}
+    .pitch-control{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border:1px solid #444;padding:6px 8px;border-radius:6px;background:#333}
+    .pitch-control button.active{background:#555}
+    .pitch-control input[type=range]{flex:1;min-width:140px}
+    .pitch-label{min-width:160px;font-weight:600}
+    .pitch-meta{font-size:12px;opacity:0.8}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="spiral"></canvas>
+    <div id="controls">
+      <div id="topControls">
+        <button id="play">▶</button>
+        <button id="f0drone">f<sub>0</sub> Drone 🔇</button>
+        <span>🔊</span>
+        <input id="volume" type="range" min="0" max="100" value="50" />
+      </div>
+      <div id="addSection">
+        <span>Add another shruti</span>
+        <button id="add">+</button>
+      </div>
+      <div id="pitchList"></div>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
