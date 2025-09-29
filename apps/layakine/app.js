@@ -373,18 +373,20 @@ function drawQuadrantLabel(name, quadrant) {
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
   const isLeft = quadrant.includes('left');
   const letterCount = Math.max(1, label.length);
-  const verticalPadding = height * 0.12;
-  const availableHeight = Math.max(0, height - verticalPadding * 2);
-  const spacing = letterCount === 1 ? 0 : availableHeight / (letterCount - 1);
+  const labelAreaHeight = height / 3;
+  const labelAreaTop = offsetY + (height - labelAreaHeight) / 2;
+  const labelAreaBottom = labelAreaTop + labelAreaHeight;
+  const spacing =
+    letterCount === 1
+      ? 0
+      : (labelAreaHeight === 0 ? 0 : labelAreaHeight / (letterCount - 1));
 
   ctx.save();
   ctx.fillStyle = getSegmentColor(name);
 
-  const maxLetterHeight = availableHeight / letterCount;
-  const baseFontSize = isLeft
-    ? Math.min(width * 0.035, height * 0.045)
-    : Math.min(width * 0.06, height * 0.08);
-  const fontSize = Math.min(baseFontSize, maxLetterHeight * 0.7 || baseFontSize);
+  const maxLetterHeight = labelAreaHeight / letterCount;
+  const baseFontSize = Math.min(width * 0.035, height * 0.045);
+  const fontSize = Math.min(baseFontSize, maxLetterHeight * 0.8 || baseFontSize);
   ctx.font = `600 ${fontSize}px "Futura", "Helvetica Neue", Arial, sans-serif`;
   ctx.textAlign = isLeft ? 'left' : 'right';
   ctx.textBaseline = 'middle';
@@ -396,8 +398,8 @@ function drawQuadrantLabel(name, quadrant) {
 
   for (let i = 0; i < letterCount; i += 1) {
     const y = letterCount === 1
-      ? offsetY + height / 2
-      : offsetY + verticalPadding + spacing * i;
+      ? (labelAreaTop + labelAreaBottom) / 2
+      : labelAreaTop + spacing * i;
     ctx.fillText(label[i], textX, y);
   }
 
