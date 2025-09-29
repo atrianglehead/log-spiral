@@ -190,10 +190,10 @@ function resetSchedulers() {
   });
 
   const nadaiSegmentDuration = gatiSideDuration * (1 / nadaiValue);
-  const nadaiCycleSegments = nadaiValue >= 1 ? Math.max(1, Math.round(nadaiValue)) : 1;
+  const nadaiSubdivisions = jatiSegments;
   recalcVoice('nadai', nadaiSegmentDuration, {
-    cycleSegments: nadaiCycleSegments,
-    playEverySegment: nadaiCycleSegments <= 1,
+    cycleSegments: nadaiSubdivisions,
+    playEverySegment: nadaiSubdivisions <= 1,
   });
 }
 
@@ -368,6 +368,38 @@ function drawQuadrantShape(name, config, elapsed) {
   }
 }
 
+function drawQuadrantLabel(name, quadrant) {
+  const label = name.toUpperCase();
+  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
+  const stripWidth = Math.max(24, width * 0.12);
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.fillRect(offsetX, offsetY, stripWidth, height);
+
+  ctx.strokeStyle = '#1f1f1f';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(offsetX + stripWidth, offsetY);
+  ctx.lineTo(offsetX + stripWidth, offsetY + height);
+  ctx.stroke();
+
+  ctx.fillStyle = getSegmentColor(name);
+  const fontSize = Math.min(stripWidth * 0.7, (height / label.length) * 0.9);
+  ctx.font = `bold ${fontSize}px "Futura", "Helvetica Neue", Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const textX = offsetX + stripWidth / 2;
+  const spacing = height / (label.length + 1);
+  for (let i = 0; i < label.length; i += 1) {
+    const textY = offsetY + spacing * (i + 1);
+    ctx.fillText(label[i], textX, textY);
+  }
+
+  ctx.restore();
+}
+
 function render() {
   resizeCanvas();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -445,6 +477,11 @@ function render() {
   drawQuadrantShape('gati', { ...gatiShape, orientation: 'top-left' }, elapsed);
   drawQuadrantShape('jati', { ...jatiShape, orientation: 'top-right' }, elapsed);
   drawQuadrantShape('nadai', { ...nadaiShape, orientation: 'bottom-right' }, elapsed);
+
+  drawQuadrantLabel('laya', 'bottom-left');
+  drawQuadrantLabel('gati', 'top-left');
+  drawQuadrantLabel('jati', 'top-right');
+  drawQuadrantLabel('nadai', 'bottom-right');
 
   scheduleAudio();
   requestAnimationFrame(render);
