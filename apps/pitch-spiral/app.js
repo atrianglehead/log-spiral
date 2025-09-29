@@ -204,24 +204,29 @@ function draw() {
     const r = radiusFor(ang);
     const x = r * Math.cos(ang);
     const y = r * Math.sin(ang);
-    ctx.strokeStyle = colorFor(ang);
+    const color = colorFor(ang);
+    const alpha = p.muted ? 0.2 : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(x, y);
     ctx.stroke();
-    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, handleR, 0, TAU);
     ctx.fill();
+    ctx.restore();
   });
 
   if (playing && playhead.active) {
     const ang = currentPlayheadAngle();
     if (Number.isFinite(ang)) {
       const displayAng = normalizeAngle(ang);
-      const tipR = outerR + 18;
-      const baseR = outerR + 4;
+      const tipR = outerR - 12;
+      const baseR = outerR + 6;
       const tipX = tipR * Math.cos(displayAng);
       const tipY = tipR * Math.sin(displayAng);
       const baseX = baseR * Math.cos(displayAng);
