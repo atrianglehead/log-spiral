@@ -98,6 +98,15 @@ let lastDragged = null;
 let lastTouchTap = 0;
 let lastTouchX = 0;
 let lastTouchY = 0;
+const playhead = {
+  active: false,
+  angle: 0
+};
+
+function setPlayheadAngle(angle) {
+  playhead.active = true;
+  playhead.angle = angle;
+}
 
 function angleFor(p) { return p.baseAngle + p.detune * CENTS_TO_ANGLE; }
 function radiusFor(angle) { return innerR * Math.pow(2, angle / TAU); }
@@ -213,6 +222,7 @@ function draw() {
   ctx.stroke();
   ctx.setLineDash([]);
 
+  const soloActive = pitches.some(p => p.solo);
   const sorted = [...pitches].sort((a,b) => angleFor(a) - angleFor(b));
   if (lastDragged) {
     const idx = sorted.indexOf(lastDragged);
@@ -227,17 +237,48 @@ function draw() {
     const r = radiusFor(ang);
     const x = r * Math.cos(ang);
     const y = r * Math.sin(ang);
-    ctx.strokeStyle = colorFor(ang);
+    const color = colorFor(ang);
+    const visuallyMuted = p.muted || (soloActive && !p.solo);
+    const alpha = visuallyMuted ? 0.2 : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(x, y);
     ctx.stroke();
-    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, handleR, 0, TAU);
     ctx.fill();
+    ctx.restore();
   });
+
+  if (playing && playhead.active && Number.isFinite(playhead.angle)) {
+    const displayAng = normalizeAngle(playhead.angle);
+    const spiralR = radiusFor(displayAng);
+    const tipR = spiralR + 12;
+    const baseR = tipR + 14;
+    const tipX = tipR * Math.cos(displayAng);
+    const tipY = tipR * Math.sin(displayAng);
+    const baseX = baseR * Math.cos(displayAng);
+    const baseY = baseR * Math.sin(displayAng);
+    const perp = displayAng + Math.PI / 2;
+    const halfWidth = 6;
+    const offsetX = Math.cos(perp) * halfWidth;
+    const offsetY = Math.sin(perp) * halfWidth;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(baseX + offsetX, baseY + offsetY);
+    ctx.lineTo(baseX - offsetX, baseY - offsetY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -589,6 +630,7 @@ function stopPlayback() {
   currentOscs = [];
   playing = false;
   playBtn.textContent = '▶';
+  playhead.active = false;
 }
 
 async function startSequential() {
@@ -597,9 +639,14 @@ async function startSequential() {
   while (playing) {
     const sorted = [...pitches].sort((a,b)=>angleFor(a) - angleFor(b));
     const soloActive = pitches.some(p=>p.solo);
-    for (const p of sorted) {
+    const playable = sorted.filter(p => !p.muted && (!soloActive || p.solo));
+    if (playable.length === 0) {
+      playhead.active = false;
+      await new Promise(r => setTimeout(r, dur));
+      continue;
+    }
+    for (const p of playable) {
       if (!playing) break;
-      if (p.muted || (soloActive && !p.solo)) continue;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
@@ -612,6 +659,8 @@ async function startSequential() {
       osc.stop(ctx.currentTime + dur/1000);
       const obj = {osc, gain};
       currentOscs.push(obj);
+      const startAngle = normalizeAngle(angleFor(p));
+      setPlayheadAngle(startAngle);
       await new Promise(r => setTimeout(r, dur));
       currentOscs = currentOscs.filter(o => o !== obj);
       if (!playing) break;
@@ -644,4 +693,11 @@ resize();
 updateControls();
 draw();
 updateDrone();
+
+function animationLoop() {
+  draw();
+  requestAnimationFrame(animationLoop);
+}
+
+animationLoop();
 
