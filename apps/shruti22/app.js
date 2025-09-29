@@ -40,6 +40,18 @@ const SHRUTI_DATA = [
   { code: 'N2', name: 'Teevra Nishad (Higher)', ratio: '243/128' }
 ];
 
+const SHRUTI_POSITIONS = SHRUTI_DATA.map(shruti => {
+  const ratioValue = ratioToNumber(shruti.ratio);
+  const angle = ((Math.log2(ratioValue) * TAU) % TAU + TAU) % TAU;
+  return {
+    ...shruti,
+    angle,
+    title: `${shruti.code} — ${shruti.name}`,
+    ratioValue
+  };
+});
+const SHRUTI_TOLERANCE = CENTS_TO_ANGLE * 0.25; // quarter-cent tolerance
+
 function ratioToNumber(ratio) {
   if (typeof ratio === 'number') return ratio;
   const [num, den] = ratio.split('/').map(Number);
@@ -271,20 +283,10 @@ function updateControls() {
     info.style.minWidth = '160px';
     const label = document.createElement('span');
     label.className = 'pitch-label';
-    if (p.title) {
-      label.textContent = p.title;
-    } else {
-      label.innerHTML = `f<sub>${i}</sub>`;
-    }
     info.appendChild(label);
-    let meta = null;
-    if (p.ratioText) {
-      meta = document.createElement('span');
-      meta.className = 'pitch-meta';
-      const cents = (Math.log2(p.ratioValue) * 1200).toFixed(2);
-      meta.textContent = `${p.ratioText} • ${cents}¢`;
-      info.appendChild(meta);
-    }
+    const meta = document.createElement('span');
+    meta.className = 'pitch-meta';
+    info.appendChild(meta);
     const slider = document.createElement('input');
     slider.type = 'range';
     p._label = label;
@@ -298,6 +300,7 @@ function updateControls() {
       const handleInput = e => {
         tonicHz = parseFloat(e.target.value);
         updateTonicSound();
+        refreshPitchLabels();
       };
       slider.addEventListener('input', handleInput);
       const start = () => startTonicSound();
@@ -323,6 +326,7 @@ function updateControls() {
         }
         draw();
         updatePitchControlColor(p);
+        refreshPitchLabels();
         if (p._osc) updatePitchSound(p);
       };
       slider.addEventListener('input', handleInput);
@@ -348,6 +352,55 @@ function updateControls() {
     }
     controls.appendChild(row);
   });
+  refreshPitchLabels();
+}
+
+function normalizeAngle(angle) {
+  return ((angle % TAU) + TAU) % TAU;
+}
+
+function findMatchingShruti(angle) {
+  const normalized = normalizeAngle(angle);
+  let best = null;
+  let bestDiff = SHRUTI_TOLERANCE;
+  for (const shruti of SHRUTI_POSITIONS) {
+    let diff = Math.abs(normalized - shruti.angle);
+    if (diff > TAU / 2) diff = TAU - diff;
+    if (diff <= bestDiff) {
+      best = shruti;
+      bestDiff = diff;
+    }
+  }
+  return best;
+}
+
+function refreshPitchLabels() {
+  const sorted = [...pitches].sort((a,b) => angleFor(a) - angleFor(b));
+  let serial = 0;
+  for (const p of sorted) {
+    const label = p._label;
+    const meta = p._meta;
+    if (!label && !meta) continue;
+    const ang = normalizeAngle(angleFor(p));
+    const shruti = findMatchingShruti(ang);
+    if (label) {
+      if (shruti) {
+        label.textContent = shruti.title;
+      } else {
+        label.innerHTML = `f<sub>${serial}</sub>`;
+        serial += 1;
+      }
+    }
+    if (meta) {
+      const ratio = Math.pow(2, ang / TAU);
+      const cents = (ang / TAU) * 1200;
+      let ratioPart = `×${ratio.toFixed(5)}`;
+      if (shruti && shruti.ratio) {
+        ratioPart = `${shruti.ratio} (${ratioPart})`;
+      }
+      meta.textContent = `${ratioPart} • ${cents.toFixed(2)}¢`;
+    }
+  }
 }
 
 function removePitch(id) {
@@ -495,6 +548,7 @@ canvas.addEventListener('pointermove', e => {
   draw();
   updatePitchSound(dragging);
   updatePitchControlColor(dragging);
+  refreshPitchLabels();
 });
 
 function finalizeDrag(e) {
