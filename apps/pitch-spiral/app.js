@@ -41,6 +41,9 @@ let currentOscs = [];   // oscillators for play button
 let tonicOsc = null, tonicGain = null; // oscillator for tonic slider
 let f0Osc = null, f0Gain = null; // oscillator for f0 drone
 let lastDragged = null;
+let lastTouchTap = 0;
+let lastTouchX = 0;
+let lastTouchY = 0;
 
 function angleFor(p) { return p.baseAngle + p.detune * CENTS_TO_ANGLE; }
 function radiusFor(angle) { return innerR * Math.pow(2, angle / TAU); }
@@ -51,6 +54,75 @@ function colorFor(angle) {
 function frequencyFor(p) {
   const ang = ((angleFor(p) % TAU) + TAU) % TAU;
   return tonicHz * Math.pow(2, ang / TAU);
+}
+
+function getCanvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    mx: e.clientX - rect.left - cx,
+    my: e.clientY - rect.top - cy
+  };
+}
+
+function hitTestPitch(mx, my) {
+  for (const p of pitches) {
+    const ang = angleFor(p);
+    const r = radiusFor(ang);
+    const x = r * Math.cos(ang);
+    const y = r * Math.sin(ang);
+    const dist = Math.hypot(mx - x, my - y);
+    if (dist < handleR + 3) {
+      return { pitch: p, type: 'handle' };
+    }
+    const t = (mx * x + my * y) / (r * r);
+    if (t > 0 && t < 1) {
+      const lx = x * t;
+      const ly = y * t;
+      const lineDist = Math.hypot(mx - lx, my - ly);
+      if (lineDist < handleR) {
+        return { pitch: p, type: 'line' };
+      }
+    }
+  }
+  return null;
+}
+
+function addPitchAtAngle(angle) {
+  if (!Number.isFinite(angle)) return;
+  if (angle < 0) angle += TAU;
+  pitches.push({ id: nextId++, baseAngle: angle, detune: 0, muted: false, solo: false });
+  updateControls();
+  draw();
+}
+
+function handleDoubleAction(mx, my) {
+  const hit = hitTestPitch(mx, my);
+  if (hit && !hit.pitch.fixed) {
+    removePitch(hit.pitch.id);
+    return true;
+  }
+  if (!hit) {
+    const ang = Math.atan2(my, mx);
+    const dist = Math.hypot(mx, my);
+    if (dist > handleR * 0.5) {
+      addPitchAtAngle(ang);
+      return true;
+    }
+  }
+  return false;
+}
+
+function handleTouchDoubleTap(e, mx, my) {
+  if (e.pointerType !== 'touch') return false;
+  const now = performance.now();
+  if (now - lastTouchTap < 300 && Math.hypot(mx - lastTouchX, my - lastTouchY) < handleR * 2) {
+    lastTouchTap = 0;
+    return handleDoubleAction(mx, my);
+  }
+  lastTouchTap = now;
+  lastTouchX = mx;
+  lastTouchY = my;
+  return false;
 }
 
 function resize() {
@@ -322,41 +394,32 @@ function updateDrone() {
 
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left - cx;
-  const my = e.clientY - rect.top - cy;
-  for (const p of pitches) {
-    const ang = angleFor(p);
-    const r = radiusFor(ang);
-    const x = r * Math.cos(ang);
-    const y = r * Math.sin(ang);
-    const dist = Math.hypot(mx - x, my - y);
-    if (dist < handleR + 3) {
-      activePitch = p;
-      startPitchSound(p);
-      if (!p.fixed) {
-        dragging = p;
-        p.baseAngle = ang;
-        p.detune = 0;
-        lastDragged = p;
-        updateControls();
-      }
-      return;
+  const { mx, my } = getCanvasCoords(e);
+  if (handleTouchDoubleTap(e, mx, my)) return;
+  const hit = hitTestPitch(mx, my);
+  if (hit) {
+    const p = hit.pitch;
+    activePitch = p;
+    startPitchSound(p);
+    if (!p.fixed && hit.type === 'handle') {
+      dragging = p;
+      p.baseAngle = angleFor(p);
+      p.detune = 0;
+      lastDragged = p;
+      updateControls();
     }
-    const t = (mx*x + my*y) / (r*r);
-    if (t > 0 && t < 1) {
-      const lx = x * t;
-      const ly = y * t;
-      const lineDist = Math.hypot(mx - lx, my - ly);
-      if (lineDist < handleR) {
-        activePitch = p;
-        startPitchSound(p);
-        return;
-      }
-    }
+    return;
   }
   // ensure we continue receiving events while dragging
-  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  if (e.pointerId !== undefined) {
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+});
+
+canvas.addEventListener('dblclick', e => {
+  e.preventDefault();
+  const { mx, my } = getCanvasCoords(e);
+  handleDoubleAction(mx, my);
 });
 
 canvas.addEventListener('pointermove', e => {
