@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Layakine</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #040404;
+      --panel: #111;
+      --accent: #f4a261;
+      --line: #202020;
+      --text-muted: #9d9d9d;
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: #f4f4f4;
+      display: flex;
+      min-height: 100vh;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 16px 32px;
+      gap: 16px;
+      max-width: 960px;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+    .control-strip {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 12px;
+      min-height: 56px;
+    }
+    .control {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .control label {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      min-width: 48px;
+    }
+    .mute {
+      background: #262626;
+      border: 1px solid #333;
+      border-radius: 999px;
+      color: #f4f4f4;
+      font-size: 0.75rem;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .mute.active {
+      background: #501b1b;
+      color: #ffb4b4;
+    }
+    input[type="range"] {
+      flex: 1;
+    }
+    .value {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.85rem;
+      min-width: 40px;
+      text-align: right;
+      color: #f8f8f8;
+    }
+    .canvas-wrapper {
+      position: relative;
+      flex: 1;
+      min-height: 380px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      padding: 16px;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 12px;
+      background: #080808;
+    }
+    #play-toggle {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 1px solid #2a2a2a;
+      background: rgba(20, 20, 20, 0.85);
+      color: #f7f7f7;
+      font-size: 1.4rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease;
+    }
+    #play-toggle:hover {
+      background: rgba(40, 40, 40, 0.85);
+    }
+    @media (max-width: 720px) {
+      main { padding: 16px 12px 24px; }
+      .control-strip { grid-template-columns: 1fr; }
+      #play-toggle { width: 56px; height: 56px; font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Layakine</h1>
+    <section class="control-strip" aria-label="Gati and Jati controls">
+      <div class="control">
+        <label for="gati">Gati</label>
+        <button class="mute" data-target="gati" aria-pressed="false">Mute</button>
+        <input id="gati" type="range" min="1" max="13" step="1" value="4" />
+        <span class="value" data-for="gati">4</span>
+      </div>
+      <div class="control">
+        <label for="jati">Jati</label>
+        <button class="mute" data-target="jati" aria-pressed="false">Mute</button>
+        <input id="jati" type="range" min="1" max="13" step="1" value="3" />
+        <span class="value" data-for="jati">3</span>
+      </div>
+    </section>
+    <div class="canvas-wrapper">
+      <canvas id="layakine-canvas" width="800" height="800" aria-hidden="true"></canvas>
+      <button id="play-toggle" type="button" aria-label="Play">▶</button>
+    </div>
+    <section class="control-strip" aria-label="Laya and Nadai controls">
+      <div class="control">
+        <label for="laya">Laya</label>
+        <button class="mute" data-target="laya" aria-pressed="false">Mute</button>
+        <input id="laya" type="range" min="30" max="120" step="1" value="72" />
+        <span class="value" data-for="laya">72</span>
+      </div>
+      <div class="control">
+        <label for="nadai">Nadai</label>
+        <button class="mute" data-target="nadai" aria-pressed="false">Mute</button>
+        <input id="nadai" type="range" min="0" max="24" step="1" value="12" />
+        <span class="value" data-for="nadai">1</span>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
