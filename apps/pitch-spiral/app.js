@@ -190,6 +190,7 @@ function draw() {
   ctx.stroke();
   ctx.setLineDash([]);
 
+  const soloActive = pitches.some(p => p.solo);
   const sorted = [...pitches].sort((a,b) => angleFor(a) - angleFor(b));
   if (lastDragged) {
     const idx = sorted.indexOf(lastDragged);
@@ -205,7 +206,8 @@ function draw() {
     const x = r * Math.cos(ang);
     const y = r * Math.sin(ang);
     const color = colorFor(ang);
-    const alpha = p.muted ? 0.2 : 1;
+    const visuallyMuted = p.muted || (soloActive && !p.solo);
+    const alpha = visuallyMuted ? 0.2 : 1;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = color;
@@ -225,14 +227,15 @@ function draw() {
     const ang = currentPlayheadAngle();
     if (Number.isFinite(ang)) {
       const displayAng = normalizeAngle(ang);
-      const tipR = outerR - 12;
-      const baseR = outerR + 6;
+      const spiralR = radiusFor(displayAng);
+      const tipR = spiralR + 12;
+      const baseR = tipR + 14;
       const tipX = tipR * Math.cos(displayAng);
       const tipY = tipR * Math.sin(displayAng);
       const baseX = baseR * Math.cos(displayAng);
       const baseY = baseR * Math.sin(displayAng);
       const perp = displayAng + Math.PI / 2;
-      const halfWidth = 8;
+      const halfWidth = 6;
       const offsetX = Math.cos(perp) * halfWidth;
       const offsetY = Math.sin(perp) * halfWidth;
       ctx.fillStyle = '#fff';
