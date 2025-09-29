@@ -46,34 +46,16 @@ let lastTouchX = 0;
 let lastTouchY = 0;
 const playhead = {
   active: false,
-  startAngle: 0,
-  endAngle: 0,
-  startTime: 0,
-  endTime: 0
+  angle: 0
 };
 
 function normalizeAngle(angle) {
   return ((angle % TAU) + TAU) % TAU;
 }
 
-function setPlayheadSegment(startAngle, endAngle, durationMs) {
+function setPlayheadAngle(angle) {
   playhead.active = true;
-  playhead.startAngle = startAngle;
-  playhead.endAngle = endAngle;
-  const now = performance.now();
-  playhead.startTime = now;
-  playhead.endTime = now + durationMs;
-}
-
-function currentPlayheadAngle() {
-  if (!playhead.active) return null;
-  const now = performance.now();
-  const { startAngle, endAngle, startTime, endTime } = playhead;
-  if (endTime <= startTime) {
-    return endAngle;
-  }
-  const t = Math.min(1, Math.max(0, (now - startTime) / (endTime - startTime)));
-  return startAngle + (endAngle - startAngle) * t;
+  playhead.angle = angle;
 }
 
 function angleFor(p) { return p.baseAngle + p.detune * CENTS_TO_ANGLE; }
@@ -223,32 +205,29 @@ function draw() {
     ctx.restore();
   });
 
-  if (playing && playhead.active) {
-    const ang = currentPlayheadAngle();
-    if (Number.isFinite(ang)) {
-      const displayAng = normalizeAngle(ang);
-      const spiralR = radiusFor(displayAng);
-      const tipR = spiralR + 12;
-      const baseR = tipR + 14;
-      const tipX = tipR * Math.cos(displayAng);
-      const tipY = tipR * Math.sin(displayAng);
-      const baseX = baseR * Math.cos(displayAng);
-      const baseY = baseR * Math.sin(displayAng);
-      const perp = displayAng + Math.PI / 2;
-      const halfWidth = 6;
-      const offsetX = Math.cos(perp) * halfWidth;
-      const offsetY = Math.sin(perp) * halfWidth;
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(tipX, tipY);
-      ctx.lineTo(baseX + offsetX, baseY + offsetY);
-      ctx.lineTo(baseX - offsetX, baseY - offsetY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
+  if (playing && playhead.active && Number.isFinite(playhead.angle)) {
+    const displayAng = normalizeAngle(playhead.angle);
+    const spiralR = radiusFor(displayAng);
+    const tipR = spiralR + 12;
+    const baseR = tipR + 14;
+    const tipX = tipR * Math.cos(displayAng);
+    const tipY = tipR * Math.sin(displayAng);
+    const baseX = baseR * Math.cos(displayAng);
+    const baseY = baseR * Math.sin(displayAng);
+    const perp = displayAng + Math.PI / 2;
+    const halfWidth = 6;
+    const offsetX = Math.cos(perp) * halfWidth;
+    const offsetY = Math.sin(perp) * halfWidth;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(baseX + offsetX, baseY + offsetY);
+    ctx.lineTo(baseX - offsetX, baseY - offsetY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -570,14 +549,7 @@ async function startSequential() {
       const obj = {osc, gain};
       currentOscs.push(obj);
       const startAngle = normalizeAngle(angleFor(p));
-      const nextPitch = playable[(i + 1) % playable.length];
-      let endAngle = normalizeAngle(angleFor(nextPitch));
-      if (i === playable.length - 1) {
-        endAngle += TAU;
-      } else if (endAngle <= startAngle) {
-        endAngle += TAU;
-      }
-      setPlayheadSegment(startAngle, endAngle, dur);
+      setPlayheadAngle(startAngle);
       await new Promise(r => setTimeout(r, dur));
       currentOscs = currentOscs.filter(o => o !== obj);
       if (!playing) break;
