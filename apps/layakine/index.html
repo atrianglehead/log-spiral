@@ -14,12 +14,16 @@
       --text-muted: #9d9d9d;
       font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+    html, body {
+      height: 100%;
+    }
     body {
       margin: 0;
       background: var(--bg);
       color: #f4f4f4;
       display: flex;
       min-height: 100vh;
+      overflow: hidden;
     }
     main {
       flex: 1;
@@ -30,6 +34,8 @@
       max-width: 960px;
       margin: 0 auto;
       box-sizing: border-box;
+      height: 100%;
+      overflow: hidden;
     }
     h1 {
       font-size: 1.5rem;
@@ -86,8 +92,8 @@
     }
     .canvas-wrapper {
       position: relative;
-      flex: 1;
-      min-height: 380px;
+      flex: 1 1 auto;
+      min-height: 0;
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 16px;
@@ -156,8 +162,8 @@
       <div class="control">
         <label for="laya">Laya</label>
         <button class="mute" data-target="laya" aria-pressed="false">Mute</button>
-        <input id="laya" type="range" min="30" max="120" step="1" value="72" />
-        <span class="value" data-for="laya">72</span>
+        <input id="laya" type="range" min="30" max="120" step="1" value="40" />
+        <span class="value" data-for="laya">40</span>
       </div>
       <div class="control">
         <label for="nadai">Nadai</label>

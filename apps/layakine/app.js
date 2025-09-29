@@ -53,10 +53,38 @@ const muteState = {
 };
 
 const voices = {
-  laya: { wave: 'sine', frequency: 220, nextIndex: 0, segmentDuration: 1 },
-  gati: { wave: 'triangle', frequency: 320, nextIndex: 0, segmentDuration: 1 },
-  jati: { wave: 'square', frequency: 420, nextIndex: 0, segmentDuration: 1 },
-  nadai: { wave: 'sawtooth', frequency: 540, nextIndex: 0, segmentDuration: 1 },
+  laya: {
+    wave: 'sine',
+    frequency: 220,
+    nextIndex: 0,
+    segmentDuration: 1,
+    cycleSegments: 1,
+    playEverySegment: true,
+  },
+  gati: {
+    wave: 'triangle',
+    frequency: 320,
+    nextIndex: 0,
+    segmentDuration: 1,
+    cycleSegments: 1,
+    playEverySegment: true,
+  },
+  jati: {
+    wave: 'square',
+    frequency: 420,
+    nextIndex: 0,
+    segmentDuration: 1,
+    cycleSegments: 1,
+    playEverySegment: false,
+  },
+  nadai: {
+    wave: 'sawtooth',
+    frequency: 540,
+    nextIndex: 0,
+    segmentDuration: 1,
+    cycleSegments: 1,
+    playEverySegment: false,
+  },
 };
 
 function ensureAudio() {
@@ -106,9 +134,12 @@ function playClick(kind, time) {
   osc.stop(time + 0.2);
 }
 
-function recalcVoice(name, segmentDuration) {
+function recalcVoice(name, segmentDuration, options = {}) {
+  const { cycleSegments = 1, playEverySegment = true } = options;
   const voice = voices[name];
   voice.segmentDuration = segmentDuration;
+  voice.cycleSegments = Math.max(1, cycleSegments);
+  voice.playEverySegment = playEverySegment;
   if (!audioCtx) {
     voice.nextIndex = 0;
     voice.nextTime = 0;
@@ -142,17 +173,28 @@ function resetSchedulers() {
   const jatiCount = Number(sliders.jati.value);
   const nadaiValue = nadaiValues[Number(sliders.nadai.value)];
 
-  recalcVoice('laya', layaPeriod);
+  recalcVoice('laya', layaPeriod, { cycleSegments: 1, playEverySegment: true });
 
   const gatiSegmentCount = gatiCount === 1 ? 1 : gatiCount;
   const gatiSegmentDuration = layaPeriod / gatiSegmentCount;
-  recalcVoice('gati', gatiSegmentDuration);
+  recalcVoice('gati', gatiSegmentDuration, {
+    cycleSegments: gatiSegmentCount,
+    playEverySegment: true,
+  });
 
   const gatiSideDuration = layaPeriod / Math.max(1, gatiCount);
-  recalcVoice('jati', gatiSideDuration);
+  const jatiSegments = jatiCount === 1 ? 1 : jatiCount;
+  recalcVoice('jati', gatiSideDuration, {
+    cycleSegments: jatiSegments,
+    playEverySegment: jatiSegments <= 1,
+  });
 
   const nadaiSegmentDuration = gatiSideDuration * (1 / nadaiValue);
-  recalcVoice('nadai', nadaiSegmentDuration);
+  const nadaiCycleSegments = nadaiValue >= 1 ? Math.max(1, Math.round(nadaiValue)) : 1;
+  recalcVoice('nadai', nadaiSegmentDuration, {
+    cycleSegments: nadaiCycleSegments,
+    playEverySegment: nadaiCycleSegments <= 1,
+  });
 }
 
 function scheduleAudio() {
@@ -167,7 +209,14 @@ function scheduleAudio() {
       voice.nextTime = startTime;
     }
     while (voice.segmentDuration > 0 && voice.nextTime <= now + lookAhead) {
-      playClick(name, voice.nextTime);
+      const cycleSegments = voice.cycleSegments || 1;
+      if (
+        voice.playEverySegment ||
+        cycleSegments <= 1 ||
+        voice.nextIndex % cycleSegments === 0
+      ) {
+        playClick(name, voice.nextTime);
+      }
       voice.nextIndex += 1;
       voice.nextTime = startTime + voice.nextIndex * voice.segmentDuration;
     }
