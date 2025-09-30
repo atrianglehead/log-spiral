@@ -55,6 +55,10 @@
       min-height: 56px;
     }
     .control {
+      --control-color: #f4f4f4;
+      --control-color-soft: rgba(255, 255, 255, 0.08);
+      --control-color-strong: rgba(255, 255, 255, 0.2);
+      --control-color-text-on: #080808;
       display: flex;
       gap: 12px;
       align-items: center;
@@ -63,32 +67,61 @@
       font-size: 0.85rem;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: var(--text-muted);
+      color: var(--control-color);
       min-width: 48px;
     }
     .mute {
-      background: #262626;
-      border: 1px solid #333;
+      background: var(--control-color-soft);
+      border: 1px solid var(--control-color-strong);
       border-radius: 999px;
-      color: #f4f4f4;
+      color: var(--control-color);
       font-size: 0.75rem;
       padding: 6px 12px;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
     .mute.active {
-      background: #501b1b;
-      color: #ffb4b4;
+      background: var(--control-color);
+      color: var(--control-color-text-on);
+      box-shadow: 0 0 0 2px var(--control-color-strong);
     }
     input[type="range"] {
       flex: 1;
+      accent-color: var(--control-color);
     }
     .value {
       font-variant-numeric: tabular-nums;
       font-size: 0.85rem;
-      min-width: 40px;
+      min-width: 48px;
       text-align: right;
-      color: #f8f8f8;
+      color: var(--control-color);
+    }
+    .control[data-kind="gati"] {
+      --control-color: #2a9d8f;
+      --control-color-soft: rgba(42, 157, 143, 0.16);
+      --control-color-strong: rgba(42, 157, 143, 0.38);
+      --control-color-text-on: #031f1c;
+    }
+    .control[data-kind="jati"] {
+      --control-color: #e76f51;
+      --control-color-soft: rgba(231, 111, 81, 0.18);
+      --control-color-strong: rgba(231, 111, 81, 0.42);
+      --control-color-text-on: #2f120c;
+    }
+    .control[data-kind="laya"] {
+      --control-color: #f4a261;
+      --control-color-soft: rgba(244, 162, 97, 0.16);
+      --control-color-strong: rgba(244, 162, 97, 0.42);
+      --control-color-text-on: #251406;
+    }
+    .control[data-kind="nadai"] {
+      --control-color: #9c6ade;
+      --control-color-soft: rgba(156, 106, 222, 0.2);
+      --control-color-strong: rgba(156, 106, 222, 0.45);
+      --control-color-text-on: #1b1032;
     }
     .canvas-wrapper {
       position: relative;
@@ -141,13 +174,13 @@
   <main>
     <h1>Layakine</h1>
     <section class="control-strip" aria-label="Gati and Jati controls">
-      <div class="control">
+      <div class="control" data-kind="gati">
         <label for="gati">Gati</label>
         <button class="mute" data-target="gati" aria-pressed="false">Mute</button>
         <input id="gati" type="range" min="1" max="13" step="1" value="4" />
         <span class="value" data-for="gati">4</span>
       </div>
-      <div class="control">
+      <div class="control" data-kind="jati">
         <label for="jati">Jati</label>
         <button class="mute" data-target="jati" aria-pressed="false">Mute</button>
         <input id="jati" type="range" min="1" max="13" step="1" value="3" />
@@ -159,13 +192,13 @@
       <button id="play-toggle" type="button" aria-label="Play">▶</button>
     </div>
     <section class="control-strip" aria-label="Laya and Nadai controls">
-      <div class="control">
+      <div class="control" data-kind="laya">
         <label for="laya">Laya</label>
         <button class="mute" data-target="laya" aria-pressed="false">Mute</button>
         <input id="laya" type="range" min="30" max="120" step="1" value="40" />
-        <span class="value" data-for="laya">40</span>
+        <span class="value" data-for="laya">40 bpm</span>
       </div>
-      <div class="control">
+      <div class="control" data-kind="nadai">
         <label for="nadai">Nadai</label>
         <button class="mute" data-target="nadai" aria-pressed="false">Mute</button>
         <input id="nadai" type="range" min="0" max="24" step="1" value="12" />

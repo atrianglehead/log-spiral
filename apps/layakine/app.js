@@ -105,8 +105,12 @@ function getElapsed() {
   return ctx.currentTime - startTime;
 }
 
+function formatLayaValue(value) {
+  return `${value} bpm`;
+}
+
 function updateValueLabels() {
-  valueLabels.laya.textContent = sliders.laya.value;
+  valueLabels.laya.textContent = formatLayaValue(sliders.laya.value);
   valueLabels.gati.textContent = sliders.gati.value;
   valueLabels.jati.textContent = sliders.jati.value;
   const nadaiIndex = Number(sliders.nadai.value);
@@ -368,6 +372,17 @@ function drawQuadrantShape(name, config, elapsed) {
   }
 }
 
+function drawMuteOverlay(quadrant) {
+  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+  ctx.fillRect(offsetX, offsetY, width, height);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(offsetX, offsetY, width, height);
+  ctx.restore();
+}
+
 function drawQuadrantLabel(name, quadrant) {
   const label = name.toUpperCase();
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
@@ -489,6 +504,19 @@ function render() {
   drawQuadrantLabel('jati', 'top-right');
   drawQuadrantLabel('nadai', 'bottom-right');
 
+  if (muteState.laya) {
+    drawMuteOverlay('bottom-left');
+  }
+  if (muteState.gati) {
+    drawMuteOverlay('top-left');
+  }
+  if (muteState.jati) {
+    drawMuteOverlay('top-right');
+  }
+  if (muteState.nadai) {
+    drawMuteOverlay('bottom-right');
+  }
+
   scheduleAudio();
   requestAnimationFrame(render);
 }
@@ -524,6 +552,8 @@ Object.entries(sliders).forEach(([name, input]) => {
     if (name === 'nadai') {
       const display = nadaiLabels[Number(input.value)];
       valueLabels.nadai.textContent = display;
+    } else if (name === 'laya') {
+      valueLabels.laya.textContent = formatLayaValue(input.value);
     } else {
       valueLabels[name].textContent = input.value;
     }
@@ -543,6 +573,7 @@ muteButtons.forEach((button) => {
     muteState[target] = !muteState[target];
     button.classList.toggle('active', muteState[target]);
     button.setAttribute('aria-pressed', muteState[target] ? 'true' : 'false');
+    button.textContent = muteState[target] ? 'Muted' : 'Mute';
   });
 });
 
