@@ -302,6 +302,52 @@ function drawCircle(point, color) {
   ctx.fill();
 }
 
+function drawEventMarker(point, strokeColor, fillColor, radius) {
+  ctx.save();
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = Math.max(1, radius * 0.5);
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function getLineSoundPoints(start, end, config, soundMarkers) {
+  if (soundMarkers?.mode === 'count') {
+    const count = Math.max(1, Math.floor(soundMarkers.count));
+    if (count === 1) {
+      return [start];
+    }
+    const points = [];
+    for (let i = 0; i < count; i += 1) {
+      const t = count === 1 ? 0 : i / (count - 1);
+      points.push(lerpPoint(start, end, t));
+    }
+    return points;
+  }
+  if (soundMarkers?.mode === 'first') {
+    return [start];
+  }
+  const points = [start];
+  if (config.bounce || (config.segmentCount && config.segmentCount > 1)) {
+    points.push(end);
+  }
+  return points;
+}
+
+function getPolygonSoundPoints(points, soundMarkers) {
+  if (soundMarkers?.mode === 'first') {
+    return [points[0]];
+  }
+  if (soundMarkers?.mode === 'count') {
+    const count = Math.max(1, Math.min(points.length, Math.floor(soundMarkers.count)));
+    return points.slice(0, count);
+  }
+  return points;
+}
+
 function getSegmentColor(name) {
   switch (name) {
     case 'laya':
@@ -335,10 +381,18 @@ function getStrokeColor(name) {
 function drawQuadrantShape(name, config, elapsed) {
   ctx.strokeStyle = getStrokeColor(name);
   ctx.lineWidth = 3;
+  const strokeColor = ctx.strokeStyle;
   const color = getSegmentColor(name);
+  const eventRadius = ctx.lineWidth;
   if (config.shape === 'line') {
     const [start, end] = getLinePoints(config.orientation);
     drawLine(start, end);
+
+    const eventPoints = getLineSoundPoints(start, end, config, config.soundMarkers);
+    eventPoints.forEach((pt) => {
+      drawEventMarker(pt, strokeColor, color, eventRadius);
+    });
+
     let point;
     if (config.bounce) {
       const segmentDuration = config.segmentDuration;
@@ -360,6 +414,10 @@ function drawQuadrantShape(name, config, elapsed) {
   } else if (config.shape === 'polygon') {
     const { points } = getPolygonPoints(config.orientation, config.sides);
     drawPolygon(points);
+    const eventPoints = getPolygonSoundPoints(points, config.soundMarkers);
+    eventPoints.forEach((pt) => {
+      drawEventMarker(pt, strokeColor, color, eventRadius);
+    });
     const segmentDuration = config.segmentDuration;
     const cycleDuration = segmentDuration * config.segmentCount;
     const local = elapsed % cycleDuration;
@@ -375,7 +433,7 @@ function drawQuadrantShape(name, config, elapsed) {
 function drawMuteOverlay(quadrant) {
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
   ctx.save();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
   ctx.fillRect(offsetX, offsetY, width, height);
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
   ctx.lineWidth = 2;
@@ -446,6 +504,7 @@ function render() {
     orientation: 'bottom-left',
     segmentDuration: layaPeriod,
     bounce: false,
+    soundMarkers: { mode: 'first' },
   };
 
   const gatiShape = (() => {
@@ -495,9 +554,33 @@ function render() {
   })();
 
   drawQuadrantShape('laya', { ...layaConfig }, elapsed);
-  drawQuadrantShape('gati', { ...gatiShape, orientation: 'top-left' }, elapsed);
-  drawQuadrantShape('jati', { ...jatiShape, orientation: 'top-right' }, elapsed);
-  drawQuadrantShape('nadai', { ...nadaiShape, orientation: 'bottom-right' }, elapsed);
+  drawQuadrantShape(
+    'gati',
+    {
+      ...gatiShape,
+      orientation: 'top-left',
+      soundMarkers: { mode: 'count', count: gatiCount },
+    },
+    elapsed,
+  );
+  drawQuadrantShape(
+    'jati',
+    {
+      ...jatiShape,
+      orientation: 'top-right',
+      soundMarkers: { mode: 'first' },
+    },
+    elapsed,
+  );
+  drawQuadrantShape(
+    'nadai',
+    {
+      ...nadaiShape,
+      orientation: 'bottom-right',
+      soundMarkers: { mode: 'first' },
+    },
+    elapsed,
+  );
 
   drawQuadrantLabel('laya', 'bottom-left');
   drawQuadrantLabel('gati', 'top-left');
