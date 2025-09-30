@@ -596,7 +596,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
         segmentDuration: safeLayaPeriod,
         segmentCount: 1,
         bounce: false,
-        soundMarkers: { mode: 'count', count: gatiCount },
+        soundMarkers: { mode: 'first' },
       };
     }
     const segmentDuration = safeLayaPeriod / Math.max(1, gatiCount);
@@ -605,7 +605,35 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
       segmentDuration,
       segmentCount: gatiCount === 2 ? 2 : gatiCount,
       bounce: false,
-      soundMarkers: { mode: 'count', count: gatiCount },
+      soundMarkers: { mode: 'first' },
+    };
+  })();
+
+  const jatiView1d = (() => {
+    if (!safeLayaPeriod) {
+      return null;
+    }
+    const segmentDuration = jatiCycle || jatiShape.segmentDuration || safeLayaPeriod;
+    return {
+      shape: 'line',
+      segmentDuration,
+      segmentCount: 1,
+      bounce: false,
+      soundMarkers: { mode: 'first' },
+    };
+  })();
+
+  const nadaiView1d = (() => {
+    if (!safeLayaPeriod) {
+      return null;
+    }
+    const segmentDuration = nadaiCycle || nadaiShape.segmentDuration || safeLayaPeriod;
+    return {
+      shape: 'line',
+      segmentDuration,
+      segmentCount: 1,
+      bounce: false,
+      soundMarkers: { mode: 'first' },
     };
   })();
 
@@ -628,10 +656,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     jati: {
       orientation: 'top-right',
       cycleDuration: jatiCycle,
-      view1d: {
-        ...jatiShape,
-        soundMarkers: { mode: 'first' },
-      },
+      view1d: jatiView1d,
       view2d: {
         ...jatiShape,
         soundMarkers: { mode: 'first' },
@@ -640,10 +665,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     nadai: {
       orientation: 'bottom-right',
       cycleDuration: nadaiCycle,
-      view1d: {
-        ...nadaiShape,
-        soundMarkers: { mode: 'first' },
-      },
+      view1d: nadaiView1d,
       view2d: {
         ...nadaiShape,
         soundMarkers: { mode: 'first' },
