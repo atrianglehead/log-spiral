@@ -552,20 +552,41 @@ function drawGatiQuadrant3d(config, elapsed) {
   const isoCorners = baseCorners.map((corner) => project(corner, 0));
   const stationaryMarkerEnabled =
     view2d?.soundMarkers?.mode === 'count' && view2d.soundMarkers.count <= 2;
-  const farCornerIndex = isoCorners.reduce(
+  const farTopIndex = isoCorners.reduce(
     (best, corner, index) => (corner.y < isoCorners[best].y ? index : best),
     0,
   );
-  const nearCornerIndex = isoCorners.reduce(
-    (best, corner, index) => (corner.y > isoCorners[best].y ? index : best),
+  const farRightIndex = isoCorners.reduce(
+    (best, corner, index) => (corner.x > isoCorners[best].x ? index : best),
     0,
   );
-  const farCorner = baseCorners[farCornerIndex];
-  const nearCorner = baseCorners[nearCornerIndex];
-  const diagonalBias = 0.16;
-  const diagonalStart = lerpPoint(farCorner, nearCorner, diagonalBias);
-  const diagonalEnd = lerpPoint(nearCorner, farCorner, diagonalBias);
-  const stationaryBasePoint = stationaryMarkerEnabled ? diagonalStart : null;
+  const farTopCorner = baseCorners[farTopIndex];
+  const farRightCorner = baseCorners[farRightIndex];
+  const topEdgeMidpoint = lerpPoint(farTopCorner, farRightCorner, 0.5);
+  const radialMargin = 0.16;
+  const directionToTop = {
+    x: topEdgeMidpoint.x - baseCenter.x,
+    y: topEdgeMidpoint.y - baseCenter.y,
+  };
+  const directionLength = Math.hypot(directionToTop.x, directionToTop.y) || 1;
+  const directionUnit = {
+    x: directionToTop.x / directionLength,
+    y: directionToTop.y / directionLength,
+  };
+  const shapeRadius = directionLength * (1 - radialMargin);
+  const firstMarkerBasePoint = {
+    x: baseCenter.x + directionUnit.x * shapeRadius,
+    y: baseCenter.y + directionUnit.y * shapeRadius,
+  };
+  const oppositeAxisPoint = {
+    x: baseCenter.x - directionUnit.x * shapeRadius,
+    y: baseCenter.y - directionUnit.y * shapeRadius,
+  };
+  const orientationAngle = Math.atan2(
+    firstMarkerBasePoint.y - baseCenter.y,
+    firstMarkerBasePoint.x - baseCenter.x,
+  );
+  const stationaryBasePoint = stationaryMarkerEnabled ? firstMarkerBasePoint : null;
 
   const drawMarker = (point, options = {}) => {
     const {
@@ -629,8 +650,8 @@ function drawGatiQuadrant3d(config, elapsed) {
   const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
 
   const drawLineShape = () => {
-    const start = diagonalStart;
-    const end = diagonalEnd;
+    const start = firstMarkerBasePoint;
+    const end = oppositeAxisPoint;
     const isoStart = project(start, eventHeight);
     const isoEnd = project(end, eventHeight);
 
@@ -696,7 +717,15 @@ function drawGatiQuadrant3d(config, elapsed) {
   };
 
   const drawPolygonShape = () => {
-    const { points } = getPolygonPoints(orientation, view2d.sides, { alignToDiagonal: true });
+    const sides = Math.max(3, Math.floor(view2d.sides) || 3);
+    const points = [];
+    for (let i = 0; i < sides; i += 1) {
+      const angle = orientationAngle + (i * 2 * Math.PI) / sides;
+      points.push({
+        x: baseCenter.x + shapeRadius * Math.cos(angle),
+        y: baseCenter.y + shapeRadius * Math.sin(angle),
+      });
+    }
     const isoPoints = points.map((pt) => project(pt, eventHeight));
 
     ctx.save();
@@ -745,15 +774,9 @@ function drawGatiQuadrant3d(config, elapsed) {
   };
 
   const drawCircleShape = () => {
-    const { center, radius, top } = getCircleGeometry(orientation);
-    const diagonalAngle = Math.atan2(
-      diagonalStart.y - center.y,
-      diagonalStart.x - center.x,
-    );
-    const orientedStart = {
-      x: center.x + radius * Math.cos(diagonalAngle),
-      y: center.y + radius * Math.sin(diagonalAngle),
-    };
+    const center = baseCenter;
+    const radius = shapeRadius;
+    const orientedStart = firstMarkerBasePoint;
     const samples = 64;
     ctx.save();
     ctx.strokeStyle = strokeColor;
@@ -776,11 +799,7 @@ function drawGatiQuadrant3d(config, elapsed) {
     ctx.stroke();
     ctx.restore();
 
-    if (stationaryMarkerEnabled) {
-      drawMarker(orientedStart, { height: eventHeight });
-    } else {
-      drawMarker(top, { height: eventHeight });
-    }
+    drawMarker(orientedStart, { height: eventHeight });
 
     let progress = 0;
     if (segmentDuration > 0) {
@@ -790,7 +809,7 @@ function drawGatiQuadrant3d(config, elapsed) {
       const local = elapsed % shapeCycle;
       progress = local / shapeCycle;
     }
-    const angle = diagonalAngle + 2 * Math.PI * progress;
+    const angle = orientationAngle + 2 * Math.PI * progress;
     const progressPoint = {
       x: center.x + radius * Math.cos(angle),
       y: center.y + radius * Math.sin(angle),
