@@ -328,6 +328,14 @@ function getPolygonPoints(quadrant, sides) {
   return { center, points };
 }
 
+function getCircleGeometry(quadrant) {
+  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
+  const radius = Math.min(width, height) * 0.32;
+  const center = { x: offsetX + width / 2, y: offsetY + height / 2 };
+  const top = { x: center.x, y: center.y - radius };
+  return { center, radius, top };
+}
+
 function drawCircle(point, color) {
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -470,6 +478,30 @@ function drawQuadrantShape(name, config, elapsed) {
     const next = points[(index + 1) % points.length];
     const point = lerpPoint(current, next, t);
     drawCircle(point, color);
+  } else if (config.shape === 'circle') {
+    const { center, radius, top } = getCircleGeometry(config.orientation);
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    drawEventMarker(top, strokeColor, color, eventRadius);
+
+    const segmentDuration = config.segmentDuration || 0;
+    let progress = 0;
+    if (segmentDuration > 0) {
+      const local = elapsed % segmentDuration;
+      progress = local / segmentDuration;
+    } else if (config.cycleDuration && config.cycleDuration > 0) {
+      const local = elapsed % config.cycleDuration;
+      progress = local / config.cycleDuration;
+    }
+
+    const angle = -Math.PI / 2 + 2 * Math.PI * progress;
+    const point = {
+      x: center.x + radius * Math.cos(angle),
+      y: center.y + radius * Math.sin(angle),
+    };
+    drawCircle(point, color);
   }
 }
 
@@ -528,16 +560,15 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
   const layaView =
     safeLayaPeriod > 0
       ? {
-          shape: 'line',
+          shape: 'circle',
           segmentDuration: safeLayaPeriod,
-          bounce: false,
           soundMarkers: { mode: 'first' },
         }
       : null;
 
   const gatiShape = (() => {
     if (gatiCount === 1) {
-      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: safeLayaPeriod };
+      return { shape: 'circle', segmentCount: 1, segmentDuration: safeLayaPeriod };
     }
     if (gatiCount === 2) {
       return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: safeLayaPeriod / 2 };
@@ -553,7 +584,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
   const jatiShape = (() => {
     const baseDuration = safeLayaPeriod / Math.max(1, gatiCount);
     if (jatiCount === 1) {
-      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: baseDuration };
+      return { shape: 'circle', segmentCount: 1, segmentDuration: baseDuration };
     }
     if (jatiCount === 2) {
       return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseDuration };
@@ -569,7 +600,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
   const nadaiShape = (() => {
     const baseDuration = (safeLayaPeriod / Math.max(1, gatiCount)) * (1 / nadaiValue);
     if (jatiCount === 1) {
-      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: baseDuration };
+      return { shape: 'circle', segmentCount: 1, segmentDuration: baseDuration };
     }
     if (jatiCount === 2) {
       return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseDuration };
@@ -592,19 +623,17 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     }
     if (gatiCount === 1) {
       return {
-        shape: 'line',
+        shape: 'circle',
         segmentDuration: safeLayaPeriod,
         segmentCount: 1,
-        bounce: false,
         soundMarkers: { mode: 'first' },
       };
     }
     const segmentDuration = safeLayaPeriod / Math.max(1, gatiCount);
     return {
-      shape: 'line',
+      shape: 'circle',
       segmentDuration,
       segmentCount: gatiCount === 2 ? 2 : gatiCount,
-      bounce: false,
       soundMarkers: { mode: 'first' },
     };
   })();
@@ -615,10 +644,9 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     }
     const segmentDuration = jatiCycle || jatiShape.segmentDuration || safeLayaPeriod;
     return {
-      shape: 'line',
+      shape: 'circle',
       segmentDuration,
       segmentCount: 1,
-      bounce: false,
       soundMarkers: { mode: 'first' },
     };
   })();
@@ -629,10 +657,9 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     }
     const segmentDuration = nadaiCycle || nadaiShape.segmentDuration || safeLayaPeriod;
     return {
-      shape: 'line',
+      shape: 'circle',
       segmentDuration,
       segmentCount: 1,
-      bounce: false,
       soundMarkers: { mode: 'first' },
     };
   })();
@@ -698,10 +725,9 @@ function drawQuadrant(name, config, elapsed) {
       drawQuadrantShape(
         name,
         {
-          shape: 'line',
+          shape: 'circle',
           orientation,
           segmentDuration: cycleDuration,
-          bounce: false,
           soundMarkers: fallbackMarkers,
         },
         elapsed,
