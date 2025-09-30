@@ -312,12 +312,21 @@ function getLinePoints(quadrant, margin = 0.18) {
   return [{ x: x1, y }, { x: x2, y }];
 }
 
-function getPolygonPoints(quadrant, sides) {
+function getPolygonPoints(quadrant, sides, options = {}) {
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
   const radius = Math.min(width, height) * 0.32;
   const center = { x: offsetX + width / 2, y: offsetY + height / 2 };
   const points = [];
-  const rotation = -Math.PI / 2;
+  const { rotationOffset = 0, alignToDiagonal = false } = options;
+  let rotation = -Math.PI / 2;
+  if (alignToDiagonal) {
+    const isLeft = quadrant.includes('left');
+    const isTop = quadrant.includes('top');
+    const dirX = isLeft ? -1 : 1;
+    const dirY = isTop ? -1 : 1;
+    rotation = Math.atan2(dirY, dirX);
+  }
+  rotation += rotationOffset;
   for (let i = 0; i < sides; i += 1) {
     const angle = rotation + (i * 2 * Math.PI) / sides;
     points.push({
@@ -661,7 +670,7 @@ function drawGatiQuadrant3d(config, elapsed) {
   };
 
   const drawPolygonShape = () => {
-    const { points } = getPolygonPoints(orientation, view2d.sides);
+    const { points } = getPolygonPoints(orientation, view2d.sides, { alignToDiagonal: true });
     const isoPoints = points.map((pt) => project(pt, eventHeight));
 
     ctx.save();
