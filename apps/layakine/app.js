@@ -1,3 +1,8 @@
+import {
+  createAxisRotationContext,
+  rotatePointAroundAxisOnPlane,
+} from './jati3dGeometry.js';
+
 const canvas = document.getElementById('layakine-canvas');
 const ctx = canvas.getContext('2d');
 const playToggle = document.getElementById('play-toggle');
@@ -881,6 +886,7 @@ function drawJatiQuadrant3d(config, elapsed) {
   };
   const baseShapeRadius = directionLength * (1 - radialMargin);
   const baseOrientationAngle = Math.atan2(directionUnit.y, directionUnit.x);
+  const stationarySoundCircle = baseCenter;
 
   const drawMarker = (point, options = {}) => {
     const {
@@ -939,6 +945,8 @@ function drawJatiQuadrant3d(config, elapsed) {
   drawBasePlane();
 
   const copyCount = Math.max(1, Math.floor(gatiCount) || 1);
+  const axisRotationStep =
+    gatiCount > 0 ? (Math.PI * 2) / Math.max(1, gatiCount) : 0;
   const radiusScale =
     copyCount === 1 ? 1 : Math.max(0.32, 1 / (1 + (copyCount - 1) * 0.55));
   const shapeRadius = baseShapeRadius * radiusScale;
@@ -974,11 +982,50 @@ function drawJatiQuadrant3d(config, elapsed) {
     }
   };
 
-  const processEventPoint = (point) => {
+  const rotatePointForCopy = (point, rotationContext, rotationAngle) => {
+    if (
+      !rotationContext ||
+      !rotationContext.axisUnit ||
+      !Number.isFinite(rotationAngle) ||
+      Math.abs(rotationAngle) < 1e-12
+    ) {
+      return { x: point.x, y: point.y, height: 0 };
+    }
+    return rotatePointAroundAxisOnPlane(point, rotationContext, rotationAngle);
+  };
+
+  const projectRotatedPoint = (
+    point,
+    rotationContext,
+    rotationAngle,
+    baseHeight = eventHeight,
+  ) => {
+    const rotated = rotatePointForCopy(point, rotationContext, rotationAngle);
+    return project({ x: rotated.x, y: rotated.y }, baseHeight + rotated.height);
+  };
+
+  const drawRotatedMarker = (
+    point,
+    rotationContext,
+    rotationAngle,
+    options = {},
+  ) => {
+    const rotated = rotatePointForCopy(point, rotationContext, rotationAngle);
+    const baseHeight = options.height ?? eventHeight;
+    drawMarker(
+      { x: rotated.x, y: rotated.y },
+      {
+        ...options,
+        height: baseHeight + rotated.height,
+      },
+    );
+  };
+
+  const processEventPoint = (point, rotationContext, rotationAngle) => {
     if (isCenterPoint(point)) {
       ensureCenterMarker();
     } else {
-      drawMarker(point, { height: eventHeight });
+      drawRotatedMarker(point, rotationContext, rotationAngle);
     }
   };
 
@@ -990,8 +1037,17 @@ function drawJatiQuadrant3d(config, elapsed) {
       x: start.x - direction.x * length,
       y: start.y - direction.y * length,
     };
-    const isoStart = project(start, eventHeight);
-    const isoEnd = project(end, eventHeight);
+    const rotationAngle3d = axisRotationStep * copyIndex;
+    const copyCenter = {
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2,
+    };
+    const rotationContext = createAxisRotationContext(
+      stationarySoundCircle,
+      copyCenter,
+    );
+    const isoStart = projectRotatedPoint(start, rotationContext, rotationAngle3d);
+    const isoEnd = projectRotatedPoint(end, rotationContext, rotationAngle3d);
 
     ctx.save();
     ctx.strokeStyle = strokeColor;
@@ -1007,7 +1063,9 @@ function drawJatiQuadrant3d(config, elapsed) {
     if (eventPoints.length === 0) {
       ensureCenterMarker();
     }
-    eventPoints.forEach(processEventPoint);
+    eventPoints.forEach((point) =>
+      processEventPoint(point, rotationContext, rotationAngle3d),
+    );
 
     if (!(segmentDuration > 0) || !(copyCycle > 0)) {
       return;
@@ -1040,8 +1098,7 @@ function drawJatiQuadrant3d(config, elapsed) {
       progressPoint = lerpPoint(start, end, t);
     }
 
-    drawMarker(progressPoint, {
-      height: eventHeight,
+    drawRotatedMarker(progressPoint, rotationContext, rotationAngle3d, {
       radius: baseMarkerRadius * 1.25,
       baseOpacity: 0.32,
     });
@@ -1062,7 +1119,14 @@ function drawJatiQuadrant3d(config, elapsed) {
         y: center.y + shapeRadius * Math.sin(angle),
       });
     }
-    const isoPoints = points.map((pt) => project(pt, eventHeight));
+    const rotationAngle3d = axisRotationStep * copyIndex;
+    const rotationContext = createAxisRotationContext(
+      stationarySoundCircle,
+      center,
+    );
+    const isoPoints = points.map((pt) =>
+      projectRotatedPoint(pt, rotationContext, rotationAngle3d),
+    );
 
     ctx.save();
     ctx.strokeStyle = strokeColor;
@@ -1081,7 +1145,9 @@ function drawJatiQuadrant3d(config, elapsed) {
     if (eventPoints.length === 0) {
       ensureCenterMarker();
     }
-    eventPoints.forEach(processEventPoint);
+    eventPoints.forEach((point) =>
+      processEventPoint(point, rotationContext, rotationAngle3d),
+    );
 
     if (!(segmentDuration > 0) || !(copyCycle > 0) || copyIndex !== activeCopyIndex) {
       return;
@@ -1099,8 +1165,7 @@ function drawJatiQuadrant3d(config, elapsed) {
     const next = points[(index + 1) % points.length];
     const progressPoint = lerpPoint(current, next, t);
 
-    drawMarker(progressPoint, {
-      height: eventHeight,
+    drawRotatedMarker(progressPoint, rotationContext, rotationAngle3d, {
       radius: baseMarkerRadius * 1.25,
       baseOpacity: 0.32,
     });
@@ -1114,6 +1179,11 @@ function drawJatiQuadrant3d(config, elapsed) {
     };
     const radius = shapeRadius;
     const samples = 64;
+    const rotationAngle3d = axisRotationStep * copyIndex;
+    const rotationContext = createAxisRotationContext(
+      stationarySoundCircle,
+      center,
+    );
 
     ctx.save();
     ctx.strokeStyle = strokeColor;
@@ -1126,7 +1196,11 @@ function drawJatiQuadrant3d(config, elapsed) {
         x: center.x + radius * Math.cos(angle),
         y: center.y + radius * Math.sin(angle),
       };
-      const isoPoint = project(point, eventHeight);
+      const isoPoint = projectRotatedPoint(
+        point,
+        rotationContext,
+        rotationAngle3d,
+      );
       if (i === 0) {
         ctx.moveTo(isoPoint.x, isoPoint.y);
       } else {
@@ -1155,8 +1229,7 @@ function drawJatiQuadrant3d(config, elapsed) {
       y: center.y + radius * Math.sin(angle),
     };
 
-    drawMarker(progressPoint, {
-      height: eventHeight,
+    drawRotatedMarker(progressPoint, rotationContext, rotationAngle3d, {
       radius: baseMarkerRadius * 1.25,
       baseOpacity: 0.32,
     });
