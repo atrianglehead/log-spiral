@@ -832,7 +832,7 @@ function drawGatiQuadrant3d(config, elapsed) {
 }
 
 function drawJatiQuadrant3d(config, elapsed) {
-  const { orientation, view2d, cycleDuration } = config;
+  const { orientation, view2d, cycleDuration, gatiCount = 1 } = config;
   if (!view2d) {
     return;
   }
@@ -846,7 +846,6 @@ function drawJatiQuadrant3d(config, elapsed) {
   const baseRadius = Math.min(width, height) * 0.32;
   const baseMarkerRadius = Math.max(3, canvas.width * 0.0045);
   const surfaceHeight = Math.max(2, baseMarkerRadius * 0.6);
-  const markerHeight = surfaceHeight;
   const eventHeight = surfaceHeight;
 
   const project = (point, heightOffset = 0) =>
@@ -859,18 +858,12 @@ function drawJatiQuadrant3d(config, elapsed) {
     { x: baseCenter.x - baseRadius, y: baseCenter.y + baseRadius },
   ];
   const isoCorners = baseCorners.map((corner) => project(corner, 0));
-  const stationaryMarkerEnabled =
-    view2d?.soundMarkers?.mode === 'count' && view2d.soundMarkers.count <= 2;
   const farTopIndex = isoCorners.reduce(
     (best, corner, index) => (corner.y < isoCorners[best].y ? index : best),
     0,
   );
   const farRightIndex = isoCorners.reduce(
     (best, corner, index) => (corner.x > isoCorners[best].x ? index : best),
-    0,
-  );
-  const farLeftIndex = isoCorners.reduce(
-    (best, corner, index) => (corner.x < isoCorners[best].x ? index : best),
     0,
   );
   const farTopCorner = baseCorners[farTopIndex];
@@ -886,24 +879,12 @@ function drawJatiQuadrant3d(config, elapsed) {
     x: directionToTop.x / directionLength,
     y: directionToTop.y / directionLength,
   };
-  const shapeRadius = directionLength * (1 - radialMargin);
-  const firstMarkerBasePoint = {
-    x: baseCenter.x + directionUnit.x * shapeRadius,
-    y: baseCenter.y + directionUnit.y * shapeRadius,
-  };
-  const oppositeAxisPoint = {
-    x: baseCenter.x - directionUnit.x * shapeRadius,
-    y: baseCenter.y - directionUnit.y * shapeRadius,
-  };
-  const orientationAngle = Math.atan2(
-    firstMarkerBasePoint.y - baseCenter.y,
-    firstMarkerBasePoint.x - baseCenter.x,
-  );
-  const stationaryBasePoint = stationaryMarkerEnabled ? firstMarkerBasePoint : null;
+  const baseShapeRadius = directionLength * (1 - radialMargin);
+  const baseOrientationAngle = Math.atan2(directionUnit.y, directionUnit.x);
 
   const drawMarker = (point, options = {}) => {
     const {
-      height: heightOffset = markerHeight,
+      height: heightOffset = eventHeight,
       radius = baseMarkerRadius,
       color = segmentColor,
       stroke = strokeColor,
@@ -957,14 +938,58 @@ function drawJatiQuadrant3d(config, elapsed) {
 
   drawBasePlane();
 
+  const copyCount = Math.max(1, Math.floor(gatiCount) || 1);
+  const radiusScale =
+    copyCount === 1 ? 1 : Math.max(0.32, 1 / (1 + (copyCount - 1) * 0.55));
+  const shapeRadius = baseShapeRadius * radiusScale;
+
   const segmentDuration = view2d.segmentDuration || 0;
   const segmentCount = view2d.segmentCount || 1;
   const fallbackCycle = segmentDuration * Math.max(1, segmentCount);
-  const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
+  const singleCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
+  const copyCycle = singleCycle;
+  const totalCycle = copyCycle > 0 ? copyCycle * copyCount : 0;
 
-  const drawLineShape = () => {
-    const start = firstMarkerBasePoint;
-    const end = oppositeAxisPoint;
+  let activeCopyIndex = 0;
+  let copyElapsed = 0;
+  if (copyCycle > 0 && totalCycle > 0) {
+    const totalProgress = elapsed % totalCycle;
+    activeCopyIndex = Math.min(copyCount - 1, Math.floor(totalProgress / copyCycle));
+    copyElapsed = totalProgress - activeCopyIndex * copyCycle;
+  }
+
+  const angleStep = copyCount > 1 ? (Math.PI * 2) / copyCount : 0;
+  const isCenterPoint = (point) =>
+    Math.hypot(point.x - baseCenter.x, point.y - baseCenter.y) < 0.5;
+
+  let centerMarkerDrawn = false;
+  const ensureCenterMarker = () => {
+    if (!centerMarkerDrawn) {
+      drawMarker(baseCenter, {
+        height: eventHeight,
+        radius: baseMarkerRadius * (copyCount > 1 ? 1.45 : 1.2),
+        baseOpacity: 0.38,
+      });
+      centerMarkerDrawn = true;
+    }
+  };
+
+  const processEventPoint = (point) => {
+    if (isCenterPoint(point)) {
+      ensureCenterMarker();
+    } else {
+      drawMarker(point, { height: eventHeight });
+    }
+  };
+
+  const drawLineCopy = (rotation, copyIndex) => {
+    const direction = { x: Math.cos(rotation), y: Math.sin(rotation) };
+    const start = baseCenter;
+    const length = shapeRadius * 2;
+    const end = {
+      x: start.x - direction.x * length,
+      y: start.y - direction.y * length,
+    };
     const isoStart = project(start, eventHeight);
     const isoEnd = project(end, eventHeight);
 
@@ -979,24 +1004,16 @@ function drawJatiQuadrant3d(config, elapsed) {
     ctx.restore();
 
     const eventPoints = getLineSoundPoints(start, end, view2d, view2d.soundMarkers);
-    if (stationaryBasePoint) {
-      if (eventPoints.length > 0) {
-        eventPoints[0] = stationaryBasePoint;
-      } else {
-        eventPoints.push(stationaryBasePoint);
-      }
+    if (eventPoints.length === 0) {
+      ensureCenterMarker();
     }
-    eventPoints.forEach((pt) => {
-      drawMarker(pt, { height: eventHeight });
-    });
+    eventPoints.forEach(processEventPoint);
 
-    if (!(segmentDuration > 0)) {
-      const staticPoint = stationaryBasePoint || start;
-      drawMarker(staticPoint, {
-        height: eventHeight,
-        radius: baseMarkerRadius * 1.2,
-        baseOpacity: 0.28,
-      });
+    if (!(segmentDuration > 0) || !(copyCycle > 0)) {
+      return;
+    }
+
+    if (copyIndex !== activeCopyIndex) {
       return;
     }
 
@@ -1004,7 +1021,7 @@ function drawJatiQuadrant3d(config, elapsed) {
     if (view2d.bounce) {
       const cycleDuration = segmentDuration * 2;
       if (cycleDuration > 0) {
-        const local = elapsed % cycleDuration;
+        const local = copyElapsed % cycleDuration;
         const index = Math.floor(local / segmentDuration);
         const t = (local - index * segmentDuration) / segmentDuration;
         progressPoint = index % 2 === 0 ? lerpPoint(start, end, t) : lerpPoint(end, start, t);
@@ -1012,14 +1029,15 @@ function drawJatiQuadrant3d(config, elapsed) {
     } else if (view2d.segmentCount && view2d.segmentCount > 1) {
       const cycle = segmentDuration * view2d.segmentCount;
       if (cycle > 0) {
-        const local = elapsed % cycle;
+        const local = copyElapsed % cycle;
         const index = Math.floor(local / segmentDuration);
         const t = (local - index * segmentDuration) / segmentDuration;
         progressPoint = lerpPoint(start, end, t);
       }
-    } else {
-      const local = (elapsed % segmentDuration) / segmentDuration;
-      progressPoint = lerpPoint(start, end, local);
+    } else if (segmentDuration > 0) {
+      const local = copyElapsed % segmentDuration;
+      const t = segmentDuration > 0 ? local / segmentDuration : 0;
+      progressPoint = lerpPoint(start, end, t);
     }
 
     drawMarker(progressPoint, {
@@ -1029,14 +1047,19 @@ function drawJatiQuadrant3d(config, elapsed) {
     });
   };
 
-  const drawPolygonShape = () => {
+  const drawPolygonCopy = (rotation, copyIndex) => {
     const sides = Math.max(3, Math.floor(view2d.sides) || 3);
+    const direction = { x: Math.cos(rotation), y: Math.sin(rotation) };
+    const center = {
+      x: baseCenter.x - direction.x * shapeRadius,
+      y: baseCenter.y - direction.y * shapeRadius,
+    };
     const points = [];
     for (let i = 0; i < sides; i += 1) {
-      const angle = orientationAngle + (i * 2 * Math.PI) / sides;
+      const angle = rotation + (i * 2 * Math.PI) / sides;
       points.push({
-        x: baseCenter.x + shapeRadius * Math.cos(angle),
-        y: baseCenter.y + shapeRadius * Math.sin(angle),
+        x: center.x + shapeRadius * Math.cos(angle),
+        y: center.y + shapeRadius * Math.sin(angle),
       });
     }
     const isoPoints = points.map((pt) => project(pt, eventHeight));
@@ -1055,29 +1078,26 @@ function drawJatiQuadrant3d(config, elapsed) {
     ctx.restore();
 
     const eventPoints = getPolygonSoundPoints(points, view2d.soundMarkers);
-    eventPoints.forEach((pt) => {
-      drawMarker(pt, { height: eventHeight });
-    });
+    if (eventPoints.length === 0) {
+      ensureCenterMarker();
+    }
+    eventPoints.forEach(processEventPoint);
 
-    if (!(segmentDuration > 0)) {
-      drawMarker(points[0], {
-        height: eventHeight,
-        radius: baseMarkerRadius * 1.2,
-        baseOpacity: 0.28,
-      });
+    if (!(segmentDuration > 0) || !(copyCycle > 0) || copyIndex !== activeCopyIndex) {
       return;
     }
 
     const cycle = segmentDuration * Math.max(1, view2d.segmentCount || points.length);
-    let progressPoint = points[0];
-    if (cycle > 0) {
-      const local = elapsed % cycle;
-      const index = Math.floor(local / segmentDuration);
-      const t = (local - index * segmentDuration) / segmentDuration;
-      const current = points[index % points.length];
-      const next = points[(index + 1) % points.length];
-      progressPoint = lerpPoint(current, next, t);
+    if (!(cycle > 0)) {
+      return;
     }
+
+    const local = copyElapsed % cycle;
+    const index = Math.floor(local / segmentDuration);
+    const t = (local - index * segmentDuration) / segmentDuration;
+    const current = points[index % points.length];
+    const next = points[(index + 1) % points.length];
+    const progressPoint = lerpPoint(current, next, t);
 
     drawMarker(progressPoint, {
       height: eventHeight,
@@ -1086,18 +1106,22 @@ function drawJatiQuadrant3d(config, elapsed) {
     });
   };
 
-  const drawCircleShape = () => {
-    const center = baseCenter;
+  const drawCircleCopy = (rotation, copyIndex) => {
+    const direction = { x: Math.cos(rotation), y: Math.sin(rotation) };
+    const center = {
+      x: baseCenter.x - direction.x * shapeRadius,
+      y: baseCenter.y - direction.y * shapeRadius,
+    };
     const radius = shapeRadius;
-    const orientedStart = firstMarkerBasePoint;
     const samples = 64;
+
     ctx.save();
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 3;
     ctx.lineJoin = 'round';
     ctx.beginPath();
     for (let i = 0; i <= samples; i += 1) {
-      const angle = (i / samples) * Math.PI * 2;
+      const angle = rotation + (i / samples) * Math.PI * 2;
       const point = {
         x: center.x + radius * Math.cos(angle),
         y: center.y + radius * Math.sin(angle),
@@ -1112,17 +1136,20 @@ function drawJatiQuadrant3d(config, elapsed) {
     ctx.stroke();
     ctx.restore();
 
-    drawMarker(orientedStart, { height: eventHeight });
+    ensureCenterMarker();
 
-    let progress = 0;
-    if (segmentDuration > 0) {
-      const local = elapsed % segmentDuration;
-      progress = local / segmentDuration;
-    } else if (shapeCycle > 0) {
-      const local = elapsed % shapeCycle;
-      progress = local / shapeCycle;
+    if (!(segmentDuration > 0) || !(copyCycle > 0) || copyIndex !== activeCopyIndex) {
+      return;
     }
-    const angle = orientationAngle + 2 * Math.PI * progress;
+
+    const cycle = segmentDuration > 0 ? segmentDuration : copyCycle;
+    if (!(cycle > 0)) {
+      return;
+    }
+
+    const local = copyElapsed % cycle;
+    const progress = cycle > 0 ? local / cycle : 0;
+    const angle = rotation + 2 * Math.PI * progress;
     const progressPoint = {
       x: center.x + radius * Math.cos(angle),
       y: center.y + radius * Math.sin(angle),
@@ -1135,12 +1162,19 @@ function drawJatiQuadrant3d(config, elapsed) {
     });
   };
 
-  if (view2d.shape === 'line') {
-    drawLineShape();
-  } else if (view2d.shape === 'polygon') {
-    drawPolygonShape();
-  } else if (view2d.shape === 'circle') {
-    drawCircleShape();
+  for (let copyIndex = 0; copyIndex < copyCount; copyIndex += 1) {
+    const rotation = baseOrientationAngle + angleStep * copyIndex;
+    if (view2d.shape === 'line') {
+      drawLineCopy(rotation, copyIndex);
+    } else if (view2d.shape === 'polygon') {
+      drawPolygonCopy(rotation, copyIndex);
+    } else if (view2d.shape === 'circle') {
+      drawCircleCopy(rotation, copyIndex);
+    }
+  }
+
+  if (!centerMarkerDrawn) {
+    ensureCenterMarker();
   }
 }
 
@@ -1640,6 +1674,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
         ...jatiShape,
         soundMarkers: { mode: 'first' },
       },
+      gatiCount,
     },
     nadai: {
       orientation: 'bottom-right',
@@ -1699,7 +1734,7 @@ function drawQuadrant(name, config, elapsed) {
     if (name === 'gati') {
       drawGatiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
     } else if (name === 'jati') {
-      drawJatiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
+      drawJatiQuadrant3d({ orientation, view2d, cycleDuration, gatiCount: config.gatiCount }, elapsed);
     } else if (name === 'nadai') {
       drawNadaiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
     }
