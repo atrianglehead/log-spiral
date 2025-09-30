@@ -433,7 +433,7 @@ function drawQuadrantShape(name, config, elapsed) {
 function drawMuteOverlay(quadrant) {
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
   ctx.save();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
   ctx.fillRect(offsetX, offsetY, width, height);
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
   ctx.lineWidth = 2;
