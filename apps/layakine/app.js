@@ -383,7 +383,7 @@ function drawQuadrantShape(name, config, elapsed) {
   ctx.lineWidth = 3;
   const strokeColor = ctx.strokeStyle;
   const color = getSegmentColor(name);
-  const eventRadius = ctx.lineWidth;
+  const eventRadius = ctx.lineWidth * 2;
   if (config.shape === 'line') {
     const [start, end] = getLinePoints(config.orientation);
     drawLine(start, end);
