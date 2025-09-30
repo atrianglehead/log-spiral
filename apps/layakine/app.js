@@ -17,9 +17,9 @@ const muteButtons = Array.from(document.querySelectorAll('.mute'));
 const modeButtons = Array.from(document.querySelectorAll('.mode-tab'));
 
 const quadrantModes = {
-  laya: '2d',
+  laya: '1d',
   gati: '2d',
-  jati: '2d',
+  jati: '3d',
   nadai: '2d',
 };
 
@@ -1144,6 +1144,319 @@ function drawJatiQuadrant3d(config, elapsed) {
   }
 }
 
+function drawNadaiQuadrant3d(config, elapsed) {
+  const { orientation, view2d, cycleDuration } = config;
+  if (!view2d) {
+    return;
+  }
+
+  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
+  const baseCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
+  const isoOrigin = { x: offsetX + width * 0.46, y: offsetY + height * 0.72 };
+  const scale = 0.82;
+  const strokeColor = getStrokeColor('nadai');
+  const segmentColor = getSegmentColor('nadai');
+  const baseRadius = Math.min(width, height) * 0.32;
+  const baseMarkerRadius = Math.max(3, canvas.width * 0.0045);
+  const surfaceHeight = Math.max(2, baseMarkerRadius * 0.6);
+  const markerHeight = surfaceHeight;
+  const eventHeight = surfaceHeight;
+
+  const project = (point, heightOffset = 0) =>
+    projectPointToIsometric(point, baseCenter, isoOrigin, scale, heightOffset);
+
+  const baseCorners = [
+    { x: baseCenter.x - baseRadius, y: baseCenter.y - baseRadius },
+    { x: baseCenter.x + baseRadius, y: baseCenter.y - baseRadius },
+    { x: baseCenter.x + baseRadius, y: baseCenter.y + baseRadius },
+    { x: baseCenter.x - baseRadius, y: baseCenter.y + baseRadius },
+  ];
+  const isoCorners = baseCorners.map((corner) => project(corner, 0));
+  const stationaryMarkerEnabled =
+    view2d?.soundMarkers?.mode === 'count' && view2d.soundMarkers.count <= 2;
+  const farTopIndex = isoCorners.reduce(
+    (best, corner, index) => (corner.y < isoCorners[best].y ? index : best),
+    0,
+  );
+  const farRightIndex = isoCorners.reduce(
+    (best, corner, index) => (corner.x > isoCorners[best].x ? index : best),
+    0,
+  );
+  const farLeftIndex = isoCorners.reduce(
+    (best, corner, index) => (corner.x < isoCorners[best].x ? index : best),
+    0,
+  );
+  const farTopCorner = baseCorners[farTopIndex];
+  const farRightCorner = baseCorners[farRightIndex];
+  const topEdgeMidpoint = lerpPoint(farTopCorner, farRightCorner, 0.5);
+  const radialMargin = 0.16;
+  const directionToTop = {
+    x: topEdgeMidpoint.x - baseCenter.x,
+    y: topEdgeMidpoint.y - baseCenter.y,
+  };
+  const directionLength = Math.hypot(directionToTop.x, directionToTop.y) || 1;
+  const directionUnit = {
+    x: directionToTop.x / directionLength,
+    y: directionToTop.y / directionLength,
+  };
+  const shapeRadius = directionLength * (1 - radialMargin);
+  const firstMarkerBasePoint = {
+    x: baseCenter.x + directionUnit.x * shapeRadius,
+    y: baseCenter.y + directionUnit.y * shapeRadius,
+  };
+  const oppositeAxisPoint = {
+    x: baseCenter.x - directionUnit.x * shapeRadius,
+    y: baseCenter.y - directionUnit.y * shapeRadius,
+  };
+  const orientationAngle = Math.atan2(
+    firstMarkerBasePoint.y - baseCenter.y,
+    firstMarkerBasePoint.x - baseCenter.x,
+  );
+  const stationaryBasePoint = stationaryMarkerEnabled ? firstMarkerBasePoint : null;
+
+  const drawMarker = (point, options = {}) => {
+    const {
+      height: heightOffset = markerHeight,
+      radius = baseMarkerRadius,
+      color = segmentColor,
+      stroke = strokeColor,
+      baseOpacity = 0.2,
+    } = options;
+    const top = project(point, heightOffset);
+    ctx.save();
+    if (baseOpacity > 0) {
+      ctx.globalAlpha = baseOpacity;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(top.x, top.y, radius * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(top.x, top.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, radius * 0.45);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const drawBasePlane = () => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(isoCorners[0].x, isoCorners[0].y);
+    for (let i = 1; i < isoCorners.length; i += 1) {
+      ctx.lineTo(isoCorners[i].x, isoCorners[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(44, 28, 70, 0.72)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.beginPath();
+    ctx.moveTo(isoCorners[0].x, isoCorners[0].y);
+    ctx.lineTo(isoCorners[2].x, isoCorners[2].y);
+    ctx.moveTo(isoCorners[1].x, isoCorners[1].y);
+    ctx.lineTo(isoCorners[3].x, isoCorners[3].y);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  drawBasePlane();
+
+  const segmentDuration = view2d.segmentDuration || 0;
+  const segmentCount = view2d.segmentCount || 1;
+  const fallbackCycle = segmentDuration * Math.max(1, segmentCount);
+  const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
+
+  const drawLineShape = () => {
+    const start = firstMarkerBasePoint;
+    const end = oppositeAxisPoint;
+    const isoStart = project(start, eventHeight);
+    const isoEnd = project(end, eventHeight);
+
+    ctx.save();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(isoStart.x, isoStart.y);
+    ctx.lineTo(isoEnd.x, isoEnd.y);
+    ctx.stroke();
+    ctx.restore();
+
+    const eventPoints = getLineSoundPoints(start, end, view2d, view2d.soundMarkers);
+    if (stationaryBasePoint) {
+      if (eventPoints.length > 0) {
+        eventPoints[0] = stationaryBasePoint;
+      } else {
+        eventPoints.push(stationaryBasePoint);
+      }
+    }
+    eventPoints.forEach((pt) => {
+      drawMarker(pt, { height: eventHeight });
+    });
+
+    if (!(segmentDuration > 0)) {
+      const staticPoint = stationaryBasePoint || start;
+      drawMarker(staticPoint, {
+        height: eventHeight,
+        radius: baseMarkerRadius * 1.2,
+        baseOpacity: 0.28,
+      });
+      return;
+    }
+
+    let progressPoint = start;
+    if (view2d.bounce) {
+      const cycleDuration = segmentDuration * 2;
+      if (cycleDuration > 0) {
+        const local = elapsed % cycleDuration;
+        const index = Math.floor(local / segmentDuration);
+        const t = (local - index * segmentDuration) / segmentDuration;
+        progressPoint = index % 2 === 0 ? lerpPoint(start, end, t) : lerpPoint(end, start, t);
+      }
+    } else if (view2d.segmentCount && view2d.segmentCount > 1) {
+      const cycle = segmentDuration * view2d.segmentCount;
+      if (cycle > 0) {
+        const local = elapsed % cycle;
+        const index = Math.floor(local / segmentDuration);
+        const t = (local - index * segmentDuration) / segmentDuration;
+        progressPoint = lerpPoint(start, end, t);
+      }
+    } else {
+      const local = (elapsed % segmentDuration) / segmentDuration;
+      progressPoint = lerpPoint(start, end, local);
+    }
+
+    drawMarker(progressPoint, {
+      height: eventHeight,
+      radius: baseMarkerRadius * 1.25,
+      baseOpacity: 0.32,
+    });
+  };
+
+  const drawPolygonShape = () => {
+    const sides = Math.max(3, Math.floor(view2d.sides) || 3);
+    const points = [];
+    for (let i = 0; i < sides; i += 1) {
+      const angle = orientationAngle + (i * 2 * Math.PI) / sides;
+      points.push({
+        x: baseCenter.x + shapeRadius * Math.cos(angle),
+        y: baseCenter.y + shapeRadius * Math.sin(angle),
+      });
+    }
+    const isoPoints = points.map((pt) => project(pt, eventHeight));
+
+    ctx.save();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(isoPoints[0].x, isoPoints[0].y);
+    for (let i = 1; i < isoPoints.length; i += 1) {
+      ctx.lineTo(isoPoints[i].x, isoPoints[i].y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    const eventPoints = getPolygonSoundPoints(points, view2d.soundMarkers);
+    eventPoints.forEach((pt) => {
+      drawMarker(pt, { height: eventHeight });
+    });
+
+    if (!(segmentDuration > 0)) {
+      drawMarker(points[0], {
+        height: eventHeight,
+        radius: baseMarkerRadius * 1.2,
+        baseOpacity: 0.28,
+      });
+      return;
+    }
+
+    const cycle = segmentDuration * Math.max(1, view2d.segmentCount || points.length);
+    let progressPoint = points[0];
+    if (cycle > 0) {
+      const local = elapsed % cycle;
+      const index = Math.floor(local / segmentDuration);
+      const t = (local - index * segmentDuration) / segmentDuration;
+      const current = points[index % points.length];
+      const next = points[(index + 1) % points.length];
+      progressPoint = lerpPoint(current, next, t);
+    }
+
+    drawMarker(progressPoint, {
+      height: eventHeight,
+      radius: baseMarkerRadius * 1.25,
+      baseOpacity: 0.32,
+    });
+  };
+
+  const drawCircleShape = () => {
+    const center = baseCenter;
+    const radius = shapeRadius;
+    const orientedStart = firstMarkerBasePoint;
+    const samples = 64;
+    ctx.save();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i <= samples; i += 1) {
+      const angle = (i / samples) * Math.PI * 2;
+      const point = {
+        x: center.x + radius * Math.cos(angle),
+        y: center.y + radius * Math.sin(angle),
+      };
+      const isoPoint = project(point, eventHeight);
+      if (i === 0) {
+        ctx.moveTo(isoPoint.x, isoPoint.y);
+      } else {
+        ctx.lineTo(isoPoint.x, isoPoint.y);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    drawMarker(orientedStart, { height: eventHeight });
+
+    let progress = 0;
+    if (segmentDuration > 0) {
+      const local = elapsed % segmentDuration;
+      progress = local / segmentDuration;
+    } else if (shapeCycle > 0) {
+      const local = elapsed % shapeCycle;
+      progress = local / shapeCycle;
+    }
+    const angle = orientationAngle + 2 * Math.PI * progress;
+    const progressPoint = {
+      x: center.x + radius * Math.cos(angle),
+      y: center.y + radius * Math.sin(angle),
+    };
+
+    drawMarker(progressPoint, {
+      height: eventHeight,
+      radius: baseMarkerRadius * 1.25,
+      baseOpacity: 0.32,
+    });
+  };
+
+  if (view2d.shape === 'line') {
+    drawLineShape();
+  } else if (view2d.shape === 'polygon') {
+    drawPolygonShape();
+  } else if (view2d.shape === 'circle') {
+    drawCircleShape();
+  }
+}
+
 function drawMuteOverlay(quadrant) {
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
   ctx.save();
@@ -1387,6 +1700,8 @@ function drawQuadrant(name, config, elapsed) {
       drawGatiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
     } else if (name === 'jati') {
       drawJatiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
+    } else if (name === 'nadai') {
+      drawNadaiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
     }
   }
 }
