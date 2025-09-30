@@ -542,6 +542,33 @@ function drawGatiQuadrant3d(config, elapsed) {
   const project = (point, heightOffset = 0) =>
     projectPointToIsometric(point, baseCenter, isoOrigin, scale, heightOffset);
 
+  const baseCorners = [
+    { x: baseCenter.x - baseRadius, y: baseCenter.y - baseRadius },
+    { x: baseCenter.x + baseRadius, y: baseCenter.y - baseRadius },
+    { x: baseCenter.x + baseRadius, y: baseCenter.y + baseRadius },
+    { x: baseCenter.x - baseRadius, y: baseCenter.y + baseRadius },
+  ];
+  const isoCorners = baseCorners.map((corner) => project(corner, 0));
+  const stationaryMarkerEnabled =
+    view2d?.soundMarkers?.mode === 'count' && view2d.soundMarkers.count <= 2;
+  const stationaryBasePoint = (() => {
+    if (!stationaryMarkerEnabled || baseCorners.length === 0) {
+      return null;
+    }
+    const farCornerIndex = isoCorners.reduce(
+      (best, corner, index) => (corner.y < isoCorners[best].y ? index : best),
+      0,
+    );
+    const nearCornerIndex = isoCorners.reduce(
+      (best, corner, index) => (corner.y > isoCorners[best].y ? index : best),
+      0,
+    );
+    const farCorner = baseCorners[farCornerIndex];
+    const nearCorner = baseCorners[nearCornerIndex];
+    const bias = 0.16;
+    return lerpPoint(farCorner, nearCorner, bias);
+  })();
+
   const drawMarker = (point, options = {}) => {
     const {
       height: heightOffset = markerHeight,
@@ -573,14 +600,6 @@ function drawGatiQuadrant3d(config, elapsed) {
   };
 
   const drawBasePlane = () => {
-    const corners = [
-      { x: baseCenter.x - baseRadius, y: baseCenter.y - baseRadius },
-      { x: baseCenter.x + baseRadius, y: baseCenter.y - baseRadius },
-      { x: baseCenter.x + baseRadius, y: baseCenter.y + baseRadius },
-      { x: baseCenter.x - baseRadius, y: baseCenter.y + baseRadius },
-    ];
-    const isoCorners = corners.map((corner) => project(corner, 0));
-
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(isoCorners[0].x, isoCorners[0].y);
@@ -627,12 +646,20 @@ function drawGatiQuadrant3d(config, elapsed) {
     ctx.restore();
 
     const eventPoints = getLineSoundPoints(start, end, view2d, view2d.soundMarkers);
+    if (stationaryBasePoint) {
+      if (eventPoints.length > 0) {
+        eventPoints[0] = stationaryBasePoint;
+      } else {
+        eventPoints.push(stationaryBasePoint);
+      }
+    }
     eventPoints.forEach((pt) => {
       drawMarker(pt, { height: eventHeight });
     });
 
     if (!(segmentDuration > 0)) {
-      drawMarker(start, {
+      const staticPoint = stationaryBasePoint || start;
+      drawMarker(staticPoint, {
         height: eventHeight,
         radius: baseMarkerRadius * 1.2,
         baseOpacity: 0.28,
@@ -742,7 +769,11 @@ function drawGatiQuadrant3d(config, elapsed) {
     ctx.stroke();
     ctx.restore();
 
-    drawMarker(top, { height: eventHeight });
+    if (stationaryBasePoint) {
+      drawMarker(stationaryBasePoint, { height: eventHeight });
+    } else {
+      drawMarker(top, { height: eventHeight });
+    }
 
     let progress = 0;
     if (segmentDuration > 0) {
