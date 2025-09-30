@@ -535,9 +535,10 @@ function drawGatiQuadrant3d(config, elapsed) {
   const strokeColor = getStrokeColor('gati');
   const segmentColor = getSegmentColor('gati');
   const baseRadius = Math.min(width, height) * 0.32;
-  const markerHeight = Math.min(width, height) * 0.22;
-  const eventHeight = markerHeight;
   const baseMarkerRadius = Math.max(3, canvas.width * 0.0045);
+  const surfaceHeight = Math.max(2, baseMarkerRadius * 0.6);
+  const markerHeight = surfaceHeight;
+  const eventHeight = surfaceHeight;
 
   const project = (point, heightOffset = 0) =>
     projectPointToIsometric(point, baseCenter, isoOrigin, scale, heightOffset);
