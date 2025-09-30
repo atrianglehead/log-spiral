@@ -14,6 +14,39 @@ const valueLabels = {
   nadai: document.querySelector('[data-for="nadai"]'),
 };
 const muteButtons = Array.from(document.querySelectorAll('.mute'));
+const modeButtons = Array.from(document.querySelectorAll('.mode-tab'));
+
+const quadrantModes = {
+  laya: '2d',
+  gati: '2d',
+  jati: '2d',
+  nadai: '2d',
+};
+
+function setQuadrantMode(quadrant, mode) {
+  if (!(quadrant in quadrantModes)) {
+    return;
+  }
+  quadrantModes[quadrant] = mode;
+  modeButtons.forEach((button) => {
+    if (button.dataset.quadrant === quadrant) {
+      button.classList.toggle('active', button.dataset.mode === mode);
+    }
+  });
+}
+
+modeButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const { quadrant, mode } = button.dataset;
+    if (quadrant && mode) {
+      setQuadrantMode(quadrant, mode);
+    }
+  });
+});
+
+Object.keys(quadrantModes).forEach((name) => {
+  setQuadrantMode(name, quadrantModes[name]);
+});
 
 let audioCtx = null;
 let masterGain = null;
@@ -479,6 +512,138 @@ function drawQuadrantLabel(name, quadrant) {
   ctx.restore();
 }
 
+function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
+  const safeLayaPeriod = Number.isFinite(layaPeriod) ? layaPeriod : 0;
+
+  const layaView =
+    safeLayaPeriod > 0
+      ? {
+          shape: 'line',
+          segmentDuration: safeLayaPeriod,
+          bounce: false,
+          soundMarkers: { mode: 'first' },
+        }
+      : null;
+
+  const gatiShape = (() => {
+    if (gatiCount === 1) {
+      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: safeLayaPeriod };
+    }
+    if (gatiCount === 2) {
+      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: safeLayaPeriod / 2 };
+    }
+    return {
+      shape: 'polygon',
+      sides: gatiCount,
+      segmentCount: gatiCount,
+      segmentDuration: safeLayaPeriod / Math.max(1, gatiCount),
+    };
+  })();
+
+  const jatiShape = (() => {
+    const baseDuration = safeLayaPeriod / Math.max(1, gatiCount);
+    if (jatiCount === 1) {
+      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: baseDuration };
+    }
+    if (jatiCount === 2) {
+      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseDuration };
+    }
+    return {
+      shape: 'polygon',
+      sides: jatiCount,
+      segmentCount: jatiCount,
+      segmentDuration: baseDuration,
+    };
+  })();
+
+  const nadaiShape = (() => {
+    const baseDuration = (safeLayaPeriod / Math.max(1, gatiCount)) * (1 / nadaiValue);
+    if (jatiCount === 1) {
+      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: baseDuration };
+    }
+    if (jatiCount === 2) {
+      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseDuration };
+    }
+    return {
+      shape: 'polygon',
+      sides: jatiCount,
+      segmentCount: jatiCount,
+      segmentDuration: baseDuration,
+    };
+  })();
+
+  const gatiCycle = (gatiShape.segmentDuration || 0) * (gatiShape.segmentCount || 1);
+  const jatiCycle = (jatiShape.segmentDuration || 0) * (jatiShape.segmentCount || 1);
+  const nadaiCycle = (nadaiShape.segmentDuration || 0) * (nadaiShape.segmentCount || 1);
+
+  return {
+    laya: {
+      orientation: 'bottom-left',
+      cycleDuration: safeLayaPeriod,
+      view2d: layaView,
+    },
+    gati: {
+      orientation: 'top-left',
+      cycleDuration: gatiCycle,
+      view2d: {
+        ...gatiShape,
+        soundMarkers: { mode: 'count', count: gatiCount },
+      },
+    },
+    jati: {
+      orientation: 'top-right',
+      cycleDuration: jatiCycle,
+      view2d: {
+        ...jatiShape,
+        soundMarkers: { mode: 'first' },
+      },
+    },
+    nadai: {
+      orientation: 'bottom-right',
+      cycleDuration: nadaiCycle,
+      view2d: {
+        ...nadaiShape,
+        soundMarkers: { mode: 'first' },
+      },
+    },
+  };
+}
+
+function drawQuadrant(name, config, elapsed) {
+  if (!config) {
+    return;
+  }
+  const mode = quadrantModes[name] || '2d';
+  const { orientation, cycleDuration, view2d } = config;
+
+  if (mode === '1d') {
+    if (cycleDuration > 0) {
+      const soundMarkers = view2d?.soundMarkers || { mode: 'first' };
+      drawQuadrantShape(
+        name,
+        {
+          shape: 'line',
+          orientation,
+          segmentDuration: cycleDuration,
+          bounce: false,
+          soundMarkers,
+        },
+        elapsed,
+      );
+    }
+    return;
+  }
+
+  if (mode === '2d' || typeof quadrantModes[name] === 'undefined') {
+    if (view2d) {
+      drawQuadrantShape(name, { ...view2d, orientation }, elapsed);
+    }
+    return;
+  }
+
+  // 3D and unspecified future modes render a blank quadrant for now.
+}
+
 function render() {
   resizeCanvas();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -499,88 +664,12 @@ function render() {
   const jatiCount = Number(sliders.jati.value);
   const nadaiValue = nadaiValues[Number(sliders.nadai.value)];
 
-  const layaConfig = {
-    shape: 'line',
-    orientation: 'bottom-left',
-    segmentDuration: layaPeriod,
-    bounce: false,
-    soundMarkers: { mode: 'first' },
-  };
+  const quadrantConfigs = buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue);
 
-  const gatiShape = (() => {
-    if (gatiCount === 1) {
-      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: layaPeriod };
-    }
-    if (gatiCount === 2) {
-      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: layaPeriod / 2 };
-    }
-    return {
-      shape: 'polygon',
-      sides: gatiCount,
-      segmentCount: gatiCount,
-      segmentDuration: layaPeriod / gatiCount,
-    };
-  })();
-
-  const jatiShape = (() => {
-    if (jatiCount === 1) {
-      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: layaPeriod / Math.max(1, gatiCount) };
-    }
-    if (jatiCount === 2) {
-      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: layaPeriod / Math.max(1, gatiCount) };
-    }
-    return {
-      shape: 'polygon',
-      sides: jatiCount,
-      segmentCount: jatiCount,
-      segmentDuration: layaPeriod / Math.max(1, gatiCount),
-    };
-  })();
-
-  const nadaiShape = (() => {
-    const baseDuration = (layaPeriod / Math.max(1, gatiCount)) * (1 / nadaiValue);
-    if (jatiCount === 1) {
-      return { shape: 'line', bounce: false, segmentCount: 1, segmentDuration: baseDuration };
-    }
-    if (jatiCount === 2) {
-      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseDuration };
-    }
-    return {
-      shape: 'polygon',
-      sides: jatiCount,
-      segmentCount: jatiCount,
-      segmentDuration: baseDuration,
-    };
-  })();
-
-  drawQuadrantShape('laya', { ...layaConfig }, elapsed);
-  drawQuadrantShape(
-    'gati',
-    {
-      ...gatiShape,
-      orientation: 'top-left',
-      soundMarkers: { mode: 'count', count: gatiCount },
-    },
-    elapsed,
-  );
-  drawQuadrantShape(
-    'jati',
-    {
-      ...jatiShape,
-      orientation: 'top-right',
-      soundMarkers: { mode: 'first' },
-    },
-    elapsed,
-  );
-  drawQuadrantShape(
-    'nadai',
-    {
-      ...nadaiShape,
-      orientation: 'bottom-right',
-      soundMarkers: { mode: 'first' },
-    },
-    elapsed,
-  );
+  drawQuadrant('laya', quadrantConfigs.laya, elapsed);
+  drawQuadrant('gati', quadrantConfigs.gati, elapsed);
+  drawQuadrant('jati', quadrantConfigs.jati, elapsed);
+  drawQuadrant('nadai', quadrantConfigs.nadai, elapsed);
 
   drawQuadrantLabel('laya', 'bottom-left');
   drawQuadrantLabel('gati', 'top-left');
