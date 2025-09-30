@@ -526,9 +526,8 @@ function drawGatiQuadrant3d(config, elapsed) {
   const strokeColor = getStrokeColor('gati');
   const segmentColor = getSegmentColor('gati');
   const baseRadius = Math.min(width, height) * 0.32;
-  const columnHeight = Math.min(width, height) * 0.22;
-  const eventHeight = columnHeight * 0.85;
-  const activeHeight = columnHeight * 1.1;
+  const markerHeight = Math.min(width, height) * 0.22;
+  const eventHeight = markerHeight;
   const baseMarkerRadius = Math.max(3, canvas.width * 0.0045);
 
   const project = (point, heightOffset = 0) =>
@@ -536,32 +535,31 @@ function drawGatiQuadrant3d(config, elapsed) {
 
   const drawMarker = (point, options = {}) => {
     const {
-      height: markerHeight = columnHeight,
+      height: heightOffset = markerHeight,
       radius = baseMarkerRadius,
       color = segmentColor,
       stroke = strokeColor,
       baseOpacity = 0.2,
     } = options;
-    const base = project(point, 0);
-    const top = project(point, markerHeight);
+    const top = project(point, heightOffset);
     ctx.save();
-    ctx.lineWidth = Math.max(1.2, radius * 0.55);
-    ctx.strokeStyle = stroke;
-    ctx.beginPath();
-    ctx.moveTo(base.x, base.y);
-    ctx.lineTo(top.x, top.y);
-    ctx.stroke();
+    if (baseOpacity > 0) {
+      ctx.globalAlpha = baseOpacity;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(top.x, top.y, radius * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
 
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(top.x, top.y, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = color;
-    ctx.globalAlpha = baseOpacity;
-    ctx.beginPath();
-    ctx.arc(base.x, base.y, radius * 1.35, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, radius * 0.45);
+    ctx.stroke();
     ctx.restore();
   };
 
@@ -606,8 +604,8 @@ function drawGatiQuadrant3d(config, elapsed) {
 
   const drawLineShape = () => {
     const [start, end] = getLinePoints(orientation);
-    const isoStart = project(start, 0);
-    const isoEnd = project(end, 0);
+    const isoStart = project(start, eventHeight);
+    const isoEnd = project(end, eventHeight);
 
     ctx.save();
     ctx.strokeStyle = strokeColor;
@@ -625,7 +623,11 @@ function drawGatiQuadrant3d(config, elapsed) {
     });
 
     if (!(segmentDuration > 0)) {
-      drawMarker(start, { height: activeHeight, radius: baseMarkerRadius * 1.2, baseOpacity: 0.28 });
+      drawMarker(start, {
+        height: eventHeight,
+        radius: baseMarkerRadius * 1.2,
+        baseOpacity: 0.28,
+      });
       return;
     }
 
@@ -652,7 +654,7 @@ function drawGatiQuadrant3d(config, elapsed) {
     }
 
     drawMarker(progressPoint, {
-      height: activeHeight,
+      height: eventHeight,
       radius: baseMarkerRadius * 1.25,
       baseOpacity: 0.32,
     });
@@ -660,7 +662,7 @@ function drawGatiQuadrant3d(config, elapsed) {
 
   const drawPolygonShape = () => {
     const { points } = getPolygonPoints(orientation, view2d.sides);
-    const isoPoints = points.map((pt) => project(pt, 0));
+    const isoPoints = points.map((pt) => project(pt, eventHeight));
 
     ctx.save();
     ctx.strokeStyle = strokeColor;
@@ -681,7 +683,11 @@ function drawGatiQuadrant3d(config, elapsed) {
     });
 
     if (!(segmentDuration > 0)) {
-      drawMarker(points[0], { height: activeHeight, radius: baseMarkerRadius * 1.2, baseOpacity: 0.28 });
+      drawMarker(points[0], {
+        height: eventHeight,
+        radius: baseMarkerRadius * 1.2,
+        baseOpacity: 0.28,
+      });
       return;
     }
 
@@ -697,7 +703,7 @@ function drawGatiQuadrant3d(config, elapsed) {
     }
 
     drawMarker(progressPoint, {
-      height: activeHeight,
+      height: eventHeight,
       radius: baseMarkerRadius * 1.25,
       baseOpacity: 0.32,
     });
@@ -717,7 +723,7 @@ function drawGatiQuadrant3d(config, elapsed) {
         x: center.x + radius * Math.cos(angle),
         y: center.y + radius * Math.sin(angle),
       };
-      const isoPoint = project(point, 0);
+      const isoPoint = project(point, eventHeight);
       if (i === 0) {
         ctx.moveTo(isoPoint.x, isoPoint.y);
       } else {
@@ -744,7 +750,7 @@ function drawGatiQuadrant3d(config, elapsed) {
     };
 
     drawMarker(progressPoint, {
-      height: activeHeight,
+      height: eventHeight,
       radius: baseMarkerRadius * 1.25,
       baseOpacity: 0.32,
     });
