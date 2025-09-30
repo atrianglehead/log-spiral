@@ -439,8 +439,18 @@ function drawQuadrantShape(name, config, elapsed) {
       } else {
         point = lerpPoint(end, start, t);
       }
+    } else if (config.segmentCount && config.segmentCount > 1 && config.segmentDuration > 0) {
+      const segmentDuration = config.segmentDuration;
+      const cycleDuration = segmentDuration * config.segmentCount;
+      const local = elapsed % cycleDuration;
+      const index = Math.floor(local / segmentDuration);
+      const t = (local - index * segmentDuration) / segmentDuration;
+      point = lerpPoint(start, end, t);
     } else {
-      const local = (elapsed % config.segmentDuration) / config.segmentDuration;
+      const local =
+        config.segmentDuration > 0
+          ? (elapsed % config.segmentDuration) / config.segmentDuration
+          : 0;
       point = lerpPoint(start, end, local);
     }
     drawCircle(point, color);
@@ -576,15 +586,40 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
   const jatiCycle = (jatiShape.segmentDuration || 0) * (jatiShape.segmentCount || 1);
   const nadaiCycle = (nadaiShape.segmentDuration || 0) * (nadaiShape.segmentCount || 1);
 
+  const gatiView1d = (() => {
+    if (!safeLayaPeriod) {
+      return null;
+    }
+    if (gatiCount === 1) {
+      return {
+        shape: 'line',
+        segmentDuration: safeLayaPeriod,
+        segmentCount: 1,
+        bounce: false,
+        soundMarkers: { mode: 'count', count: gatiCount },
+      };
+    }
+    const segmentDuration = safeLayaPeriod / Math.max(1, gatiCount);
+    return {
+      shape: 'line',
+      segmentDuration,
+      segmentCount: gatiCount === 2 ? 2 : gatiCount,
+      bounce: false,
+      soundMarkers: { mode: 'count', count: gatiCount },
+    };
+  })();
+
   return {
     laya: {
       orientation: 'bottom-left',
       cycleDuration: safeLayaPeriod,
-      view2d: layaView,
+      view1d: layaView,
+      view2d: null,
     },
     gati: {
       orientation: 'top-left',
       cycleDuration: gatiCycle,
+      view1d: gatiView1d,
       view2d: {
         ...gatiShape,
         soundMarkers: { mode: 'count', count: gatiCount },
@@ -593,6 +628,10 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     jati: {
       orientation: 'top-right',
       cycleDuration: jatiCycle,
+      view1d: {
+        ...jatiShape,
+        soundMarkers: { mode: 'first' },
+      },
       view2d: {
         ...jatiShape,
         soundMarkers: { mode: 'first' },
@@ -601,6 +640,10 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     nadai: {
       orientation: 'bottom-right',
       cycleDuration: nadaiCycle,
+      view1d: {
+        ...nadaiShape,
+        soundMarkers: { mode: 'first' },
+      },
       view2d: {
         ...nadaiShape,
         soundMarkers: { mode: 'first' },
@@ -614,11 +657,22 @@ function drawQuadrant(name, config, elapsed) {
     return;
   }
   const mode = quadrantModes[name] || '2d';
-  const { orientation, cycleDuration, view2d } = config;
+  const { orientation, cycleDuration, view1d, view2d } = config;
 
   if (mode === '1d') {
-    if (cycleDuration > 0) {
-      const soundMarkers = view2d?.soundMarkers || { mode: 'first' };
+    const view = view1d || null;
+    const fallbackMarkers = view2d?.soundMarkers || { mode: 'first' };
+    if (view) {
+      const shapeConfig = {
+        ...view,
+        orientation,
+        soundMarkers: view.soundMarkers || fallbackMarkers,
+      };
+      if (!(shapeConfig.segmentDuration > 0) && cycleDuration > 0) {
+        shapeConfig.segmentDuration = cycleDuration;
+      }
+      drawQuadrantShape(name, shapeConfig, elapsed);
+    } else if (cycleDuration > 0) {
       drawQuadrantShape(
         name,
         {
@@ -626,7 +680,7 @@ function drawQuadrant(name, config, elapsed) {
           orientation,
           segmentDuration: cycleDuration,
           bounce: false,
-          soundMarkers,
+          soundMarkers: fallbackMarkers,
         },
         elapsed,
       );
