@@ -1384,16 +1384,30 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const innerPointCandidates = shapePoints
     .map((pt, index) => ({ pt, index }))
     .filter(({ pt }) => Math.abs(pt.x - innerPointLocalX) < epsilon);
-  const averagedInnerY =
-    innerPointCandidates.length > 0
-      ?
-        innerPointCandidates.reduce((sum, { pt }) => sum + pt.y, 0) /
-        innerPointCandidates.length
-      : shapePoints[innerPointIndex]?.y ?? 0;
+
+  const primaryInnerCandidate = (() => {
+    if (!innerPointCandidates.length) {
+      return null;
+    }
+    const directMatch = innerPointCandidates.find(({ index }) => index === innerPointIndex);
+    if (directMatch) {
+      return directMatch;
+    }
+    return innerPointCandidates.reduce((best, candidate) =>
+      candidate.pt.y > best.pt.y ? candidate : best,
+    innerPointCandidates[0]);
+  })();
+
+  const referenceInnerPoint = primaryInnerCandidate?.pt ?? shapePoints[innerPointIndex] ?? {
+    x: innerPointLocalX,
+    y: 0,
+  };
+  const referenceInnerIndex = primaryInnerCandidate?.index ?? innerPointIndex;
+
   const soundCircleRadius = baseRadius + innerPointLocalX;
   const soundWorldPoint = {
     x: soundCircleRadius * Math.cos(baseAngle),
-    y: baseLift - averagedInnerY,
+    y: baseLift - referenceInnerPoint.y,
     z: soundCircleRadius * Math.sin(baseAngle),
   };
   let soundIsoPoint = projectPointIso3d(soundWorldPoint, origin, scale, verticalScale);
@@ -1451,7 +1465,10 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
 
     const innerPointIsos = points.filter((pt) => Math.abs(pt.local.x - innerPointLocalX) < epsilon);
     let referenceIso = null;
-    if (innerPointIsos.length > 0) {
+    const directReference = points.find((pt) => pt.pointIndex === referenceInnerIndex);
+    if (directReference) {
+      referenceIso = directReference.iso;
+    } else if (innerPointIsos.length > 0) {
       const sum = innerPointIsos.reduce(
         (acc, pt) => ({ x: acc.x + pt.iso.x, y: acc.y + pt.iso.y }),
         { x: 0, y: 0 },
@@ -2307,15 +2324,13 @@ function drawQuadrant(name, config, elapsed) {
     return;
   }
 
-  if (mode === '3dbeta') {
-    if (name === 'jati') {
-      drawJatiQuadrant3dBeta({
-        orientation,
-        view2d,
-        cycleDuration,
-        gatiCount: config.gatiCount,
-      }, elapsed);
-    }
+  if (mode === '3d-deprecated' && name === 'jati') {
+    drawJatiQuadrant3d({
+      orientation,
+      view2d,
+      cycleDuration,
+      gatiCount: config.gatiCount,
+    }, elapsed);
     return;
   }
 
@@ -2323,7 +2338,12 @@ function drawQuadrant(name, config, elapsed) {
     if (name === 'gati') {
       drawGatiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
     } else if (name === 'jati') {
-      drawJatiQuadrant3d({ orientation, view2d, cycleDuration, gatiCount: config.gatiCount }, elapsed);
+      drawJatiQuadrant3dBeta({
+        orientation,
+        view2d,
+        cycleDuration,
+        gatiCount: config.gatiCount,
+      }, elapsed);
     } else if (name === 'nadai') {
       drawNadaiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
     }
