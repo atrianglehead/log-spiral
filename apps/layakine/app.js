@@ -1361,18 +1361,29 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const fallbackCycle = segmentDuration * Math.max(1, cycleSegments);
   const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
 
-  let overallProgress = 0;
-  if (shapeCycle > 0) {
-    overallProgress = (elapsed % shapeCycle) / shapeCycle;
-  }
+  const gcd = (a, b) => {
+    let x = Math.abs(a);
+    let y = Math.abs(b);
+    while (y) {
+      const temp = y;
+      y = x % y;
+      x = temp;
+    }
+    return x || 1;
+  };
 
-  let activeCopyIndex = -1;
-  let copyProgress = 0;
-  if (copyCount > 0 && shapeCycle > 0) {
-    const scaled = overallProgress * copyCount;
-    activeCopyIndex = Math.floor(scaled) % copyCount;
-    copyProgress = scaled - Math.floor(scaled);
-  }
+  const lcm = (a, b) => {
+    if (a === 0 || b === 0) {
+      return 0;
+    }
+    return Math.abs((a * b) / gcd(a, b));
+  };
+
+  const lerp3d = (a, b, t) => ({
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+    z: a.z + (b.z - a.z) * t,
+  });
 
   const baseAngle = -Math.PI / 2;
   const originPoint = projectPointIso3d({ x: 0, y: 0, z: 0 }, origin, scale, verticalScale);
@@ -1383,6 +1394,22 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     const sin = Math.sin(angle);
     const basePoint = { x: cos * baseRadius, y: 0, z: sin * baseRadius };
     const isoBase = projectPointIso3d(basePoint, origin, scale, verticalScale);
+    const points = shapePoints.map((pt, pointIndex) => {
+      const radialDistance = baseRadius + pt.x;
+      const worldPoint = {
+        x: radialDistance * cos,
+        y: baseLift - pt.y,
+        z: radialDistance * sin,
+      };
+      const isoPoint = projectPointIso3d(worldPoint, origin, scale, verticalScale);
+      return {
+        pointIndex,
+        local: pt,
+        world: worldPoint,
+        iso: isoPoint,
+        copyIndex: index,
+      };
+    });
     return {
       index,
       angle,
@@ -1392,40 +1419,11 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       isoBase,
       depth: basePoint.z,
       facing: cos >= 0,
+      points,
     };
   });
 
-  const sortedInfos = copyInfos.sort((a, b) => a.depth - b.depth);
-  const drawInfos = sortedInfos;
-
-  const pathSegments = [];
-  let totalPathLength = 0;
-  for (let i = 0; i < shapePoints.length; i += 1) {
-    const current = shapePoints[i];
-    const next = shapePoints[(i + 1) % shapePoints.length];
-    const length = Math.hypot(next.x - current.x, next.y - current.y);
-    if (!(length > 0)) {
-      continue;
-    }
-    totalPathLength += length;
-    pathSegments.push({ current, next, length, cumulative: totalPathLength });
-  }
-
-  const getPathPoint = (t) => {
-    if (!pathSegments.length) {
-      return shapePoints[0];
-    }
-    const target = totalPathLength * (t % 1);
-    for (let i = 0; i < pathSegments.length; i += 1) {
-      const segment = pathSegments[i];
-      const prevLength = segment.cumulative - segment.length;
-      if (target <= segment.cumulative || i === pathSegments.length - 1) {
-        const localT = segment.length === 0 ? 0 : (target - prevLength) / segment.length;
-        return lerpPoint(segment.current, segment.next, localT);
-      }
-    }
-    return shapePoints[0];
-  };
+  const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
 
   const projectLocalPoint = (angle, point) => {
     const cos = Math.cos(angle);
@@ -1530,12 +1528,13 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     ctx.restore();
   };
 
-  const drawShape = (info) => {
-    const isoPoints = shapePoints.map((pt) => projectLocalPoint(info.angle, pt));
+  const drawShape = (info, options = {}) => {
+    const { activeCopyIndex: activeIndex } = options;
+    const isoPoints = info.points.map((pt) => pt.iso);
     if (!isoPoints.length) {
       return;
     }
-    const isActive = info.index === activeCopyIndex;
+    const isActive = info.index === activeIndex;
     const frontShade = info.facing ? 0.26 : 0.14;
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
@@ -1552,29 +1551,129 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     ctx.lineWidth = Math.max(1.6, canvas.width * (isActive ? 0.0024 : 0.0016));
     ctx.stroke();
     ctx.restore();
-
-    if (isActive && totalPathLength > 0) {
-      const localPoint = getPathPoint(copyProgress);
-      const isoPoint = projectLocalPoint(info.angle, localPoint);
-      const radius = Math.max(4, canvas.width * 0.0042);
-      ctx.save();
-      ctx.fillStyle = segmentColor;
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = Math.max(1, radius * 0.35);
-      ctx.beginPath();
-      ctx.arc(isoPoint.x, isoPoint.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
   };
+
+  const safePointCount = Math.max(1, shapePoints.length);
+  const connectors = [];
+  const totalStepCount = copyCount > 0 ? lcm(copyCount, safePointCount) : 0;
+  for (let step = 0; step < totalStepCount; step += 1) {
+    const fromCopyIndex = step % copyCount;
+    const toCopyIndex = (step + 1) % copyCount;
+    const fromPointIndex = step % safePointCount;
+    const toPointIndex = (step + 1) % safePointCount;
+    const fromCopy = copyInfos[fromCopyIndex];
+    const toCopy = copyInfos[toCopyIndex];
+    const fromPoint = fromCopy.points[fromPointIndex % fromCopy.points.length];
+    const toPoint = toCopy.points[toPointIndex % toCopy.points.length];
+    if (!fromPoint || !toPoint) {
+      continue;
+    }
+    connectors.push({
+      step,
+      from: {
+        copyIndex: fromCopyIndex,
+        pointIndex: fromPoint.pointIndex,
+        iso: fromPoint.iso,
+        world: fromPoint.world,
+        facing: fromCopy.facing,
+      },
+      to: {
+        copyIndex: toCopyIndex,
+        pointIndex: toPoint.pointIndex,
+        iso: toPoint.iso,
+        world: toPoint.world,
+        facing: toCopy.facing,
+      },
+      avgDepth: (fromPoint.world.z + toPoint.world.z) / 2,
+    });
+  }
+
+  const drawConnector = (segment, options = {}) => {
+    const {
+      stroke = 'rgba(70, 120, 140, 0.45)',
+      lineWidth = Math.max(1.2, canvas.width * 0.0016),
+    } = options;
+    ctx.save();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(segment.from.iso.x, segment.from.iso.y);
+    ctx.lineTo(segment.to.iso.x, segment.to.iso.y);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const connectorsSorted = [...connectors].sort((a, b) => a.avgDepth - b.avgDepth);
+
+  connectorsSorted.forEach((segment) => {
+    const isFront = segment.from.facing || segment.to.facing;
+    const stroke = isFront
+      ? 'rgba(120, 200, 210, 0.55)'
+      : 'rgba(26, 46, 58, 0.38)';
+    drawConnector(segment, { stroke });
+  });
+
+  let activeCopyIndex = -1;
+  let movingIsoPoint = null;
+  let activeSegment = null;
+  let overallProgress = 0;
+
+  const stepDuration = segmentDuration > 0
+    ? segmentDuration
+    : safePointCount > 0 && shapeCycle > 0
+      ? shapeCycle / safePointCount
+      : 0;
+
+  if (connectors.length > 0) {
+    const totalDuration = stepDuration * (connectors.length || 1);
+    if (stepDuration > 0 && totalDuration > 0) {
+      const localTime = ((elapsed % totalDuration) + totalDuration) % totalDuration;
+      const scaled = localTime / stepDuration;
+      const stepIndex = Math.floor(scaled) % connectors.length;
+      const stepT = scaled - Math.floor(scaled);
+      activeSegment = connectors[stepIndex];
+      activeCopyIndex = activeSegment.from.copyIndex;
+      const worldPoint = lerp3d(activeSegment.from.world, activeSegment.to.world, stepT);
+      movingIsoPoint = projectPointIso3d(worldPoint, origin, scale, verticalScale);
+      overallProgress = connectors.length > 0 ? (stepIndex + stepT) / connectors.length : 0;
+    } else {
+      activeSegment = connectors[0];
+      activeCopyIndex = activeSegment.from.copyIndex;
+      movingIsoPoint = activeSegment.from.iso;
+      overallProgress = 0;
+    }
+  } else if (shapeCycle > 0) {
+    overallProgress = (elapsed % shapeCycle) / shapeCycle;
+  }
 
   drawInfos.forEach((info) => {
     if (showFullScene) {
       drawRadialLine(info);
     }
-    drawShape(info);
+    drawShape(info, { activeCopyIndex });
   });
+
+  if (activeSegment) {
+    const highlightStroke = 'rgba(231, 111, 81, 0.85)';
+    drawConnector(activeSegment, {
+      stroke: highlightStroke,
+      lineWidth: Math.max(1.8, canvas.width * 0.002),
+    });
+  }
+
+  if (movingIsoPoint) {
+    const radius = Math.max(4, canvas.width * 0.0042);
+    ctx.save();
+    ctx.fillStyle = segmentColor;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = Math.max(1, radius * 0.35);
+    ctx.beginPath();
+    ctx.arc(movingIsoPoint.x, movingIsoPoint.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 
   const baseMarkerRadius = Math.max(4, canvas.width * 0.0046);
 
