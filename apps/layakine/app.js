@@ -542,6 +542,20 @@ function buildJatiCrossSection(view2d, radius) {
     return [];
   }
 
+  const alignBasePlane = (points) => {
+    if (!points.length) {
+      return points;
+    }
+    const minY = points.reduce(
+      (lowest, point) => (point.y < lowest ? point.y : lowest),
+      Number.POSITIVE_INFINITY,
+    );
+    if (!Number.isFinite(minY) || Math.abs(minY) < 1e-9) {
+      return points;
+    }
+    return points.map((point) => ({ x: point.x, y: point.y - minY }));
+  };
+
   if (view2d.shape === 'circle') {
     const segments = 32;
     const points = [];
@@ -549,18 +563,18 @@ function buildJatiCrossSection(view2d, radius) {
       const angle = (i / segments) * Math.PI * 2;
       points.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
     }
-    return points;
+    return alignBasePlane(points);
   }
 
   if (view2d.shape === 'line') {
     const halfLength = radius;
     const thickness = Math.max(radius * 0.28, 6);
-    return [
+    return alignBasePlane([
       { x: -halfLength, y: -thickness },
       { x: halfLength, y: -thickness },
       { x: halfLength, y: thickness },
       { x: -halfLength, y: thickness },
-    ];
+    ]);
   }
 
   if (view2d.shape === 'polygon') {
@@ -571,7 +585,7 @@ function buildJatiCrossSection(view2d, radius) {
       const angle = rotation + (i * 2 * Math.PI) / sides;
       points.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
     }
-    return points;
+    return alignBasePlane(points);
   }
 
   return [];
