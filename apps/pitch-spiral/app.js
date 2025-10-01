@@ -276,7 +276,7 @@ function updateControls() {
     updatePitchControlColor(p);
     if (p.fixed) {
       slider.min = 80;
-      slider.max = 160;
+      slider.max = 640;
       slider.value = tonicHz;
       const handleInput = e => {
         tonicHz = parseFloat(e.target.value);
