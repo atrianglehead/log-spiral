@@ -1425,6 +1425,42 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
 
   const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
 
+  const topLocalY = crossSectionData.maxY;
+  const topPointEpsilon = 1e-6;
+  const stationaryMarkerInfos = copyInfos
+    .map((info) => {
+      const topPoint = info.points.reduce((best, point) => {
+        if (!best) {
+          return point;
+        }
+        const bestValue = best.local?.y ?? Number.NEGATIVE_INFINITY;
+        const pointValue = point.local?.y ?? Number.NEGATIVE_INFINITY;
+        if (pointValue > bestValue + topPointEpsilon) {
+          return point;
+        }
+        if (Math.abs(pointValue - bestValue) <= topPointEpsilon) {
+          return point.pointIndex < best.pointIndex ? point : best;
+        }
+        return best;
+      }, null);
+      if (!topPoint) {
+        return null;
+      }
+      if (
+        Number.isFinite(topLocalY) &&
+        topPoint.local &&
+        topPoint.local.y < topLocalY - topPointEpsilon
+      ) {
+        return null;
+      }
+      return {
+        copyIndex: info.index,
+        iso: topPoint.iso,
+        facing: info.facing,
+      };
+    })
+    .filter(Boolean);
+
   const projectLocalPoint = (angle, point) => {
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
@@ -1648,9 +1684,10 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   }
 
   drawInfos.forEach((info) => {
-    if (showFullScene) {
-      drawRadialLine(info);
+    if (!showFullScene) {
+      return;
     }
+    drawRadialLine(info);
     drawShape(info, { activeCopyIndex });
   });
 
@@ -1725,6 +1762,14 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     scale,
     verticalScale,
   );
+
+  stationaryMarkerInfos.forEach((marker) => {
+    const baseOpacity = marker.facing ? 0.32 : 0.18;
+    drawMarker(marker.iso, {
+      baseOpacity,
+      radius: baseMarkerRadius * 0.8,
+    });
+  });
 
   if (showFullScene) {
     drawMarker(soundPoint, {
