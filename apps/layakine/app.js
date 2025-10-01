@@ -1614,19 +1614,6 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
 
   const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
 
-  const drawRadialLine = (info) => {
-    ctx.save();
-    ctx.strokeStyle = info.facing
-      ? 'rgba(120, 200, 210, 0.55)'
-      : 'rgba(30, 54, 64, 0.4)';
-    ctx.lineWidth = Math.max(1, canvas.width * 0.0014);
-    ctx.beginPath();
-    ctx.moveTo(soundIsoPoint.x, soundIsoPoint.y);
-    ctx.lineTo(info.radialIso.x, info.radialIso.y);
-    ctx.stroke();
-    ctx.restore();
-  };
-
   const drawShape = (info, options = {}) => {
     const { activeCopyIndex: activeIndex } = options;
     const isoPoints = info.points.map((pt) => pt.iso);
@@ -1729,7 +1716,6 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     if (!shouldDraw) {
       return;
     }
-    drawRadialLine(info);
     drawShape(info, { activeCopyIndex });
   });
 
