@@ -2324,16 +2324,6 @@ function drawQuadrant(name, config, elapsed) {
     return;
   }
 
-  if (mode === '3d-deprecated' && name === 'jati') {
-    drawJatiQuadrant3d({
-      orientation,
-      view2d,
-      cycleDuration,
-      gatiCount: config.gatiCount,
-    }, elapsed);
-    return;
-  }
-
   if (mode === '3d') {
     if (name === 'gati') {
       drawGatiQuadrant3d({ orientation, view2d, cycleDuration }, elapsed);
