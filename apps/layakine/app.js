@@ -527,6 +527,56 @@ function projectPointToIsometric(point, baseCenter, origin, scale, height = 0) {
   return { x, y };
 }
 
+function projectPointIso3d(point, origin, scale, verticalScale = 1) {
+  const scaledX = point.x * scale;
+  const scaledZ = point.z * scale;
+  const scaledY = point.y * verticalScale;
+  return {
+    x: origin.x + scaledX - scaledZ,
+    y: origin.y + (scaledX + scaledZ) * 0.5 - scaledY,
+  };
+}
+
+function buildJatiCrossSection(view2d, radius) {
+  if (!view2d) {
+    return [];
+  }
+
+  if (view2d.shape === 'circle') {
+    const segments = 32;
+    const points = [];
+    for (let i = 0; i < segments; i += 1) {
+      const angle = (i / segments) * Math.PI * 2;
+      points.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+    }
+    return points;
+  }
+
+  if (view2d.shape === 'line') {
+    const halfLength = radius;
+    const thickness = Math.max(radius * 0.28, 6);
+    return [
+      { x: -halfLength, y: -thickness },
+      { x: halfLength, y: -thickness },
+      { x: halfLength, y: thickness },
+      { x: -halfLength, y: thickness },
+    ];
+  }
+
+  if (view2d.shape === 'polygon') {
+    const sides = Math.max(3, view2d.sides || 3);
+    const points = [];
+    const rotation = -Math.PI / 2;
+    for (let i = 0; i < sides; i += 1) {
+      const angle = rotation + (i * 2 * Math.PI) / sides;
+      points.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+    }
+    return points;
+  }
+
+  return [];
+}
+
 function drawGatiQuadrant3d(config, elapsed) {
   const { orientation, view2d, cycleDuration } = config;
   if (!view2d) {
@@ -1251,6 +1301,259 @@ function drawJatiQuadrant3d(config, elapsed) {
   }
 }
 
+function drawJatiQuadrant3dBeta(config, elapsed) {
+  const { orientation, view2d, cycleDuration } = config;
+  if (!view2d) {
+    return;
+  }
+
+  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
+  const baseCenter = { x: offsetX + width * 0.63, y: offsetY + height * 0.66 };
+  const majorRadius = Math.min(width, height) * 0.24;
+  const minorRadius = Math.min(width, height) * 0.12;
+  const crossSection = buildJatiCrossSection(view2d, minorRadius);
+  if (crossSection.length < 3) {
+    return;
+  }
+
+  const strokeColor = getStrokeColor('jati');
+  const segmentColor = getSegmentColor('jati');
+  const scale = (Math.min(width, height) * 0.32) / (majorRadius + minorRadius);
+  const verticalScale = scale * 0.92;
+  const slices = 56;
+
+  const projectProfile = (angle) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return crossSection.map((point) => {
+      const radial = majorRadius + point.x;
+      const projected = projectPointIso3d(
+        {
+          x: radial * cos,
+          y: point.y,
+          z: radial * sin,
+        },
+        baseCenter,
+        scale,
+        verticalScale,
+      );
+      return projected;
+    });
+  };
+
+  const surfaceBands = [];
+  for (let i = 0; i < slices; i += 1) {
+    const angleA = (i / slices) * Math.PI * 2;
+    const angleB = ((i + 1) / slices) * Math.PI * 2;
+    const profileA = projectProfile(angleA);
+    const profileB = projectProfile(angleB);
+    const midpoint = (angleA + angleB) / 2;
+    const facing = Math.cos(midpoint) > 0;
+    const shade = 0.5 + 0.5 * Math.cos(midpoint - Math.PI / 2);
+    surfaceBands.push({
+      polygon: [...profileA, ...profileB.slice().reverse()],
+      facing,
+      shade,
+    });
+  }
+
+  const drawPolygonSurface = (points, options = {}) => {
+    if (!points.length) {
+      return;
+    }
+    const {
+      fill = 'rgba(48, 92, 108, 1)',
+      alpha = 0.3,
+      stroke = strokeColor,
+      lineWidth = Math.max(1, canvas.width * 0.0012),
+    } = options;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i += 1) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  surfaceBands
+    .filter((band) => !band.facing)
+    .forEach((band) =>
+      drawPolygonSurface(band.polygon, {
+        fill: 'rgba(22, 40, 52, 1)',
+        alpha: 0.24 + band.shade * 0.12,
+        lineWidth: Math.max(1, canvas.width * 0.0009),
+      }),
+    );
+
+  surfaceBands
+    .filter((band) => band.facing)
+    .forEach((band) =>
+      drawPolygonSurface(band.polygon, {
+        fill: 'rgba(72, 156, 172, 1)',
+        alpha: 0.32 + band.shade * 0.28,
+        lineWidth: Math.max(1.2, canvas.width * 0.0014),
+      }),
+    );
+
+  const frontProfile = projectProfile(0);
+  drawPolygonSurface(frontProfile, {
+    fill: 'rgba(88, 208, 216, 1)',
+    alpha: 0.18,
+    lineWidth: Math.max(1.2, canvas.width * 0.0016),
+  });
+
+  const radialValues = crossSection.map((point) => point.x);
+  const outerRadius = Math.max(...radialValues);
+  const innerRadius = Math.min(...radialValues);
+
+  const drawRingOutline = (radiusOffset, options = {}) => {
+    const {
+      alpha = 0.3,
+      stroke = 'rgba(255, 255, 255, 0.2)',
+      lineWidth = Math.max(1, canvas.width * 0.0012),
+      facingOnly = false,
+    } = options;
+    const samples = 72;
+    const frontPoints = [];
+    const backPoints = [];
+    for (let i = 0; i <= samples; i += 1) {
+      const angle = (i / samples) * Math.PI * 2;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const radial = majorRadius + radiusOffset;
+      const projected = projectPointIso3d(
+        {
+          x: radial * cos,
+          y: 0,
+          z: radial * sin,
+        },
+        baseCenter,
+        scale,
+        verticalScale,
+      );
+      if (cos >= 0) {
+        frontPoints.push(projected);
+      } else if (!facingOnly) {
+        backPoints.push(projected);
+      }
+    }
+
+    const drawPolyline = (points) => {
+      if (!points.length) {
+        return;
+      }
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i += 1) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    if (!facingOnly) {
+      drawPolyline(backPoints);
+    }
+    drawPolyline(frontPoints);
+  };
+
+  drawRingOutline(outerRadius, {
+    alpha: 0.32,
+    stroke: 'rgba(255, 255, 255, 0.24)',
+    lineWidth: Math.max(1.4, canvas.width * 0.0018),
+  });
+
+  drawRingOutline(innerRadius, {
+    alpha: 0.24,
+    stroke: 'rgba(10, 16, 24, 0.5)',
+    lineWidth: Math.max(1.2, canvas.width * 0.0016),
+    facingOnly: false,
+  });
+
+  const cycleSegments = view2d.segmentCount || 1;
+  const segmentDuration = view2d.segmentDuration || 0;
+  const fallbackCycle = segmentDuration * Math.max(1, cycleSegments);
+  const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
+  let progress = 0;
+  if (shapeCycle > 0) {
+    progress = (elapsed % shapeCycle) / shapeCycle;
+  }
+
+  const outerRadial = majorRadius + outerRadius;
+  const baseAngle = -Math.PI / 2;
+  const markerAngle = baseAngle + progress * Math.PI * 2;
+  const markerPoint = projectPointIso3d(
+    {
+      x: outerRadial * Math.cos(markerAngle),
+      y: 0,
+      z: outerRadial * Math.sin(markerAngle),
+    },
+    baseCenter,
+    scale,
+    verticalScale,
+  );
+
+  const soundPoint = projectPointIso3d(
+    {
+      x: outerRadial * Math.cos(baseAngle),
+      y: 0,
+      z: outerRadial * Math.sin(baseAngle),
+    },
+    baseCenter,
+    scale,
+    verticalScale,
+  );
+
+  const markerRadius = Math.max(4, canvas.width * 0.0046);
+
+  const drawMarker = (point, options = {}) => {
+    const {
+      color = segmentColor,
+      stroke = strokeColor,
+      baseOpacity = 0.32,
+      radius = markerRadius,
+    } = options;
+    ctx.save();
+    if (baseOpacity > 0) {
+      ctx.globalAlpha = baseOpacity;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, radius * 0.35);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  drawMarker(soundPoint, {
+    color: 'rgba(255, 255, 255, 0.85)',
+    stroke: 'rgba(255, 255, 255, 0.9)',
+    baseOpacity: 0.16,
+    radius: markerRadius * 0.75,
+  });
+
+  drawMarker(markerPoint);
+}
+
 function drawNadaiQuadrant3d(config, elapsed) {
   const { orientation, view2d, cycleDuration } = config;
   if (!view2d) {
@@ -1799,6 +2102,17 @@ function drawQuadrant(name, config, elapsed) {
   if (mode === '2d' || typeof quadrantModes[name] === 'undefined') {
     if (view2d) {
       drawQuadrantShape(name, { ...view2d, orientation }, elapsed);
+    }
+    return;
+  }
+
+  if (mode === '3dbeta') {
+    if (name === 'jati') {
+      drawJatiQuadrant3dBeta({
+        orientation,
+        view2d,
+        cycleDuration,
+      }, elapsed);
     }
     return;
   }
