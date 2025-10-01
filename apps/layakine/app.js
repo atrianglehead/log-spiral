@@ -1425,41 +1425,56 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
 
   const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
 
-  const topLocalY = crossSectionData.maxY;
-  const topPointEpsilon = 1e-6;
-  const stationaryMarkerInfos = copyInfos
-    .map((info) => {
-      const topPoint = info.points.reduce((best, point) => {
-        if (!best) {
-          return point;
-        }
-        const bestValue = best.local?.y ?? Number.NEGATIVE_INFINITY;
-        const pointValue = point.local?.y ?? Number.NEGATIVE_INFINITY;
-        if (pointValue > bestValue + topPointEpsilon) {
-          return point;
-        }
-        if (Math.abs(pointValue - bestValue) <= topPointEpsilon) {
-          return point.pointIndex < best.pointIndex ? point : best;
-        }
-        return best;
-      }, null);
-      if (!topPoint) {
-        return null;
-      }
-      if (
-        Number.isFinite(topLocalY) &&
-        topPoint.local &&
-        topPoint.local.y < topLocalY - topPointEpsilon
-      ) {
-        return null;
-      }
-      return {
-        copyIndex: info.index,
-        iso: topPoint.iso,
-        facing: info.facing,
-      };
-    })
-    .filter(Boolean);
+  const markerCircleRadius = baseRadius + shapeRadius * 0.15;
+  const heightTolerance = Math.max(0.5, shapeRadius * 0.04);
+  const radialTolerance = Math.max(0.5, markerCircleRadius * 0.04);
+
+  const cycleStartPointIndex = (() => {
+    const baseInfo = copyInfos[0];
+    if (!baseInfo) {
+      return null;
+    }
+    const candidate = baseInfo.points
+      .filter((point) => Math.abs(point.world.y) <= heightTolerance)
+      .filter((point) => {
+        const radialDistance = Math.hypot(point.world.x, point.world.z);
+        return Math.abs(radialDistance - markerCircleRadius) <= radialTolerance;
+      })
+      .map((point) => point.pointIndex)
+      .sort((a, b) => a - b)[0];
+    return Number.isInteger(candidate) ? candidate : null;
+  })();
+
+  const stationaryMarkerInfos =
+    cycleStartPointIndex === null
+      ? []
+      : copyInfos
+          .map((info) => {
+            const isCycleStartCopy =
+              jatiSegmentCount > 0 ? info.index % jatiSegmentCount === 0 : true;
+            if (!isCycleStartCopy) {
+              return null;
+            }
+            const matchingPoint = info.points.find((point) => {
+              if (point.pointIndex !== cycleStartPointIndex) {
+                return false;
+              }
+              if (Math.abs(point.world.y) > heightTolerance) {
+                return false;
+              }
+              const radialDistance = Math.hypot(point.world.x, point.world.z);
+              return Math.abs(radialDistance - markerCircleRadius) <= radialTolerance;
+            });
+            if (!matchingPoint) {
+              return null;
+            }
+            return {
+              copyIndex: info.index,
+              iso: matchingPoint.iso,
+              facing: info.facing,
+            };
+          })
+          .filter(Boolean);
 
   const projectLocalPoint = (angle, point) => {
     const cos = Math.cos(angle);
@@ -1743,9 +1758,9 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const markerAngle = baseAngle + overallProgress * Math.PI * 2;
   const markerPoint = projectPointIso3d(
     {
-      x: (baseRadius + shapeRadius * 0.15) * Math.cos(markerAngle),
+      x: markerCircleRadius * Math.cos(markerAngle),
       y: 0,
-      z: (baseRadius + shapeRadius * 0.15) * Math.sin(markerAngle),
+      z: markerCircleRadius * Math.sin(markerAngle),
     },
     origin,
     scale,
@@ -1754,9 +1769,9 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
 
   const soundPoint = projectPointIso3d(
     {
-      x: (baseRadius + shapeRadius * 0.15) * Math.cos(baseAngle),
+      x: markerCircleRadius * Math.cos(baseAngle),
       y: 0,
-      z: (baseRadius + shapeRadius * 0.15) * Math.sin(baseAngle),
+      z: markerCircleRadius * Math.sin(baseAngle),
     },
     origin,
     scale,
