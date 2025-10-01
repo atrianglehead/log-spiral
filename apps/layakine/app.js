@@ -1698,8 +1698,11 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     overallProgress = (elapsed % shapeCycle) / shapeCycle;
   }
 
+  const jatiGroupSize = Math.max(1, jatiSegmentCount);
+
   drawInfos.forEach((info) => {
-    if (!showFullScene) {
+    const isGroupStart = info.index % jatiGroupSize === 0;
+    if (!showFullScene && !isGroupStart) {
       return;
     }
     drawRadialLine(info);
