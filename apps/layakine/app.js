@@ -1350,7 +1350,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const segmentColor = getSegmentColor('jati');
   const scale = 1;
   const verticalScale = 0.9;
-  const baseLift = -crossSectionData.minY;
+  const baseLift = crossSectionData.maxY;
   const jatiSegmentCount = Math.max(1, Math.floor(view2d.segmentCount || 1));
   const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
   const copyCount = Math.max(1, gatiCount * jatiSegmentCount);
@@ -1437,7 +1437,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     const radialDistance = baseRadius + point.x;
     const worldPoint = {
       x: radialDistance * cos,
-      y: baseLift + point.y,
+      y: baseLift - point.y,
       z: radialDistance * sin,
     };
     return projectPointIso3d(worldPoint, origin, scale, verticalScale);
@@ -1518,7 +1518,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const drawRadialLine = (info) => {
     const base = projectLocalPoint(info.angle, {
       x: 0,
-      y: crossSectionData.minY,
+      y: crossSectionData.maxY,
     });
     ctx.save();
     ctx.strokeStyle = info.facing
