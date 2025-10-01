@@ -1330,7 +1330,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   }
 
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
-  const origin = { x: offsetX + width * 0.63, y: offsetY + height * 0.68 };
+  const origin = { x: offsetX + width * 0.54, y: offsetY + height * 0.68 };
   const baseRadius = Math.min(width, height) * 0.22;
   const shapeRadius = baseRadius * 0.55;
   const crossSectionData = buildJatiCrossSection(view2d, shapeRadius);
@@ -1344,6 +1344,15 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const scale = 1;
   const verticalScale = 0.9;
   const baseLift = crossSectionData.maxY;
+  const isLineShape = view2d.shape === 'line';
+  const minLocalX = shapePoints.reduce(
+    (minX, point) => (point.x < minX ? point.x : minX),
+    Number.POSITIVE_INFINITY,
+  );
+  const maxLocalX = shapePoints.reduce(
+    (maxX, point) => (point.x > maxX ? point.x : maxX),
+    Number.NEGATIVE_INFINITY,
+  );
   const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
   const copyCount = gatiCount;
   const showFullScene = true;
@@ -1376,7 +1385,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     y: baseLift - innerPointLocal.y,
     z: soundCircleRadius * Math.sin(baseAngle),
   };
-  const soundIsoPoint = projectPointIso3d(soundWorldPoint, origin, scale, verticalScale);
+  let soundIsoPoint = projectPointIso3d(soundWorldPoint, origin, scale, verticalScale);
 
   const baseMarkerRadius = Math.max(4, canvas.width * 0.0046);
 
@@ -1466,6 +1475,51 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       return dist > bestDist ? pt : best;
     }, translatedPoints[0]);
 
+    let lineSegment = null;
+    if (isLineShape && Number.isFinite(minLocalX) && Number.isFinite(maxLocalX)) {
+      const epsilon = 1e-6;
+      const startCandidates = translatedPoints.filter(
+        (pt) => Math.abs(pt.local.x - minLocalX) < epsilon,
+      );
+      const endCandidates = translatedPoints.filter(
+        (pt) => Math.abs(pt.local.x - maxLocalX) < epsilon,
+      );
+      const averageIso = (candidates) => {
+        if (!candidates.length) {
+          return null;
+        }
+        const sum = candidates.reduce(
+          (acc, pt) => ({ x: acc.x + pt.iso.x, y: acc.y + pt.iso.y }),
+          { x: 0, y: 0 },
+        );
+        return { x: sum.x / candidates.length, y: sum.y / candidates.length };
+      };
+      const isoStart = averageIso(startCandidates);
+      const isoEnd = averageIso(endCandidates);
+      if (isoStart && isoEnd) {
+        const lineLength = Math.hypot(isoEnd.x - isoStart.x, isoEnd.y - isoStart.y);
+        lineSegment = { start: isoStart, end: isoEnd, length: lineLength };
+      }
+    }
+
+    if (lineSegment) {
+      return {
+        index,
+        angle,
+        cos,
+        sin,
+        depth: basePoint.z,
+        facing: cos >= 0,
+        isoBase: translatedIsoBase,
+        points: translatedPoints,
+        pathIsoPoints: [lineSegment.start, lineSegment.end],
+        pathSegmentLengths: [lineSegment.length],
+        pathTotalLength: lineSegment.length,
+        radialIso: lineSegment.end || translatedIsoBase,
+        lineSegment,
+      };
+    }
+
     return {
       index,
       angle,
@@ -1479,8 +1533,83 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       pathSegmentLengths,
       pathTotalLength,
       radialIso: radialTarget?.iso || translatedIsoBase,
+      lineSegment: null,
     };
   });
+
+  const bounds = {
+    minX: Number.POSITIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+  };
+
+  const includePointInBounds = (point) => {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      return;
+    }
+    if (point.x < bounds.minX) bounds.minX = point.x;
+    if (point.y < bounds.minY) bounds.minY = point.y;
+    if (point.x > bounds.maxX) bounds.maxX = point.x;
+    if (point.y > bounds.maxY) bounds.maxY = point.y;
+  };
+
+  includePointInBounds(soundIsoPoint);
+  copyInfos.forEach((info) => {
+    includePointInBounds(info.isoBase);
+    includePointInBounds(info.radialIso);
+    info.pathIsoPoints.forEach(includePointInBounds);
+    info.points.forEach((pt) => includePointInBounds(pt.iso));
+    if (info.lineSegment) {
+      includePointInBounds(info.lineSegment.start);
+      includePointInBounds(info.lineSegment.end);
+    }
+  });
+
+  if (
+    Number.isFinite(bounds.minX) &&
+    Number.isFinite(bounds.minY) &&
+    Number.isFinite(bounds.maxX) &&
+    Number.isFinite(bounds.maxY)
+  ) {
+    const currentCenter = {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    };
+    const targetCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
+    const shift = {
+      x: targetCenter.x - currentCenter.x,
+      y: targetCenter.y - currentCenter.y,
+    };
+
+    if (Math.abs(shift.x) > 1e-6 || Math.abs(shift.y) > 1e-6) {
+      const translatePoint = (point) =>
+        point
+          ? {
+              x: point.x + shift.x,
+              y: point.y + shift.y,
+            }
+          : point;
+
+      soundIsoPoint = translatePoint(soundIsoPoint);
+      copyInfos.forEach((info) => {
+        info.isoBase = translatePoint(info.isoBase);
+        info.radialIso = translatePoint(info.radialIso);
+        info.pathIsoPoints = info.pathIsoPoints.map(translatePoint);
+        info.points = info.points.map((pt) => ({
+          ...pt,
+          iso: translatePoint(pt.iso),
+        }));
+        if (info.lineSegment) {
+          info.lineSegment = {
+            ...info.lineSegment,
+            start: translatePoint(info.lineSegment.start),
+            end: translatePoint(info.lineSegment.end),
+          };
+        }
+      });
+    }
+  }
 
   const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
 
@@ -1507,6 +1636,17 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     const frontShade = info.facing ? 0.26 : 0.14;
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
+    if (isLineShape && info.lineSegment) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(93, 42, 44, ${strokeAlpha})`;
+      ctx.lineWidth = Math.max(1.8, canvas.width * (isActive ? 0.0028 : 0.002));
+      ctx.beginPath();
+      ctx.moveTo(info.lineSegment.start.x, info.lineSegment.start.y);
+      ctx.lineTo(info.lineSegment.end.x, info.lineSegment.end.y);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(isoPoints[0].x, isoPoints[0].y);
