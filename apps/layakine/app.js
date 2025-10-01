@@ -1345,6 +1345,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const verticalScale = 0.9;
   const baseLift = crossSectionData.maxY;
   const isLineShape = view2d.shape === 'line';
+  const isCircleShape = view2d.shape === 'circle';
   const minLocalX = shapePoints.reduce(
     (minX, point) => (point.x < minX ? point.x : minX),
     Number.POSITIVE_INFINITY,
@@ -1647,6 +1648,20 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       ctx.restore();
       return;
     }
+    if (isCircleShape) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(93, 42, 44, ${strokeAlpha})`;
+      ctx.lineWidth = Math.max(1.8, canvas.width * (isActive ? 0.0026 : 0.0019));
+      ctx.beginPath();
+      ctx.moveTo(isoPoints[0].x, isoPoints[0].y);
+      for (let i = 1; i < isoPoints.length; i += 1) {
+        ctx.lineTo(isoPoints[i].x, isoPoints[i].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(isoPoints[0].x, isoPoints[0].y);
@@ -1666,7 +1681,19 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   if (copyCycle > 0 && copyInfos[activeCopyIndex]) {
     const info = copyInfos[activeCopyIndex];
     const totalLength = info.pathTotalLength;
-    if (totalLength > 0) {
+    const segmentDuration = view2d.segmentDuration || 0;
+    if (view2d.bounce && info.lineSegment && segmentDuration > 0) {
+      const bounceCycle = segmentDuration * 2;
+      const local = bounceCycle > 0 ? copyElapsed % bounceCycle : 0;
+      const phase = bounceCycle > 0 ? Math.floor(local / segmentDuration) : 0;
+      const t = segmentDuration > 0 ? (local - phase * segmentDuration) / segmentDuration : 0;
+      const fromPoint = phase % 2 === 0 ? info.lineSegment.start : info.lineSegment.end;
+      const toPoint = phase % 2 === 0 ? info.lineSegment.end : info.lineSegment.start;
+      movingIsoPoint = {
+        x: fromPoint.x + (toPoint.x - fromPoint.x) * t,
+        y: fromPoint.y + (toPoint.y - fromPoint.y) * t,
+      };
+    } else if (totalLength > 0) {
       const progress = copyElapsed / copyCycle;
       let distance = Math.max(0, Math.min(1, progress)) * totalLength;
       for (let i = 0; i < info.pathSegmentLengths.length; i += 1) {
@@ -1677,10 +1704,10 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
           continue;
         }
         if (distance <= length) {
-          const t = distance / length;
+          const tSegment = distance / length;
           movingIsoPoint = {
-            x: from.x + (to.x - from.x) * t,
-            y: from.y + (to.y - from.y) * t,
+            x: from.x + (to.x - from.x) * tSegment,
+            y: from.y + (to.y - from.y) * tSegment,
           };
           break;
         }
