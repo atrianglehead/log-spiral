@@ -1351,49 +1351,75 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const scale = 1;
   const verticalScale = 0.9;
   const baseLift = crossSectionData.maxY;
-  const jatiSegmentCount = Math.max(1, Math.floor(view2d.segmentCount || 1));
   const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
-  const copyCount = Math.max(1, gatiCount * jatiSegmentCount);
+  const copyCount = gatiCount;
   const showFullScene = Boolean(jati3dBetaCheckbox?.checked);
 
-  const cycleSegments = view2d.segmentCount || 1;
   const segmentDuration = view2d.segmentDuration || 0;
+  const cycleSegments = view2d.segmentCount || 1;
   const fallbackCycle = segmentDuration * Math.max(1, cycleSegments);
-  const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
+  const copyCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
+  const totalCycle = copyCycle > 0 ? copyCycle * copyCount : 0;
 
-  const gcd = (a, b) => {
-    let x = Math.abs(a);
-    let y = Math.abs(b);
-    while (y) {
-      const temp = y;
-      y = x % y;
-      x = temp;
-    }
-    return x || 1;
-  };
-
-  const lcm = (a, b) => {
-    if (a === 0 || b === 0) {
-      return 0;
-    }
-    return Math.abs((a * b) / gcd(a, b));
-  };
-
-  const lerp3d = (a, b, t) => ({
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    z: a.z + (b.z - a.z) * t,
-  });
+  let activeCopyIndex = 0;
+  let copyElapsed = 0;
+  if (copyCycle > 0 && totalCycle > 0) {
+    const wrapped = ((elapsed % totalCycle) + totalCycle) % totalCycle;
+    activeCopyIndex = Math.floor(wrapped / copyCycle) % copyCount;
+    copyElapsed = wrapped - activeCopyIndex * copyCycle;
+  }
 
   const baseAngle = -Math.PI / 2;
-  const originPoint = projectPointIso3d({ x: 0, y: 0, z: 0 }, origin, scale, verticalScale);
+  const angleStep = copyCount > 0 ? (Math.PI * 2) / copyCount : 0;
+
+  const innerPointIndex = shapePoints.reduce(
+    (bestIndex, point, index) => (point.x < shapePoints[bestIndex].x ? index : bestIndex),
+    0,
+  );
+  const innerPointLocal = shapePoints[innerPointIndex];
+  const soundCircleRadius = baseRadius + innerPointLocal.x;
+  const soundWorldPoint = {
+    x: soundCircleRadius * Math.cos(baseAngle),
+    y: baseLift - innerPointLocal.y,
+    z: soundCircleRadius * Math.sin(baseAngle),
+  };
+  const soundIsoPoint = projectPointIso3d(soundWorldPoint, origin, scale, verticalScale);
+
+  const baseMarkerRadius = Math.max(4, canvas.width * 0.0046);
+
+  const drawMarker = (point, options = {}) => {
+    const {
+      color = segmentColor,
+      stroke = strokeColor,
+      baseOpacity = 0.25,
+      radius = baseMarkerRadius,
+    } = options;
+    ctx.save();
+    if (baseOpacity > 0) {
+      ctx.globalAlpha = baseOpacity;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius * 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, radius * 0.35);
+    ctx.stroke();
+    ctx.restore();
+  };
 
   const copyInfos = Array.from({ length: copyCount }, (_, index) => {
-    const angle = baseAngle + (index / copyCount) * Math.PI * 2;
+    const angle = baseAngle + angleStep * index;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     const basePoint = { x: cos * baseRadius, y: 0, z: sin * baseRadius };
     const isoBase = projectPointIso3d(basePoint, origin, scale, verticalScale);
+
     const points = shapePoints.map((pt, pointIndex) => {
       const radialDistance = baseRadius + pt.x;
       const worldPoint = {
@@ -1407,86 +1433,63 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
         local: pt,
         world: worldPoint,
         iso: isoPoint,
-        copyIndex: index,
       };
     });
+
+    const innerPoint = points[innerPointIndex];
+    const offset = innerPoint
+      ? {
+          x: soundIsoPoint.x - innerPoint.iso.x,
+          y: soundIsoPoint.y - innerPoint.iso.y,
+        }
+      : { x: 0, y: 0 };
+
+    const translatedPoints = points.map((pt) => ({
+      ...pt,
+      iso: { x: pt.iso.x + offset.x, y: pt.iso.y + offset.y },
+    }));
+    const translatedIsoBase = { x: isoBase.x + offset.x, y: isoBase.y + offset.y };
+
+    const pointCount = translatedPoints.length;
+    const pathIsoPoints = [];
+    for (let i = 0; i <= pointCount; i += 1) {
+      const point = translatedPoints[(innerPointIndex + i) % pointCount];
+      pathIsoPoints.push(point.iso);
+    }
+
+    const pathSegmentLengths = [];
+    let pathTotalLength = 0;
+    for (let i = 0; i < pathIsoPoints.length - 1; i += 1) {
+      const from = pathIsoPoints[i];
+      const to = pathIsoPoints[i + 1];
+      const length = Math.hypot(to.x - from.x, to.y - from.y);
+      pathSegmentLengths.push(length);
+      pathTotalLength += length;
+    }
+
+    const radialTarget = translatedPoints.reduce((best, pt) => {
+      const bestDist = Math.hypot(best.iso.x - soundIsoPoint.x, best.iso.y - soundIsoPoint.y);
+      const dist = Math.hypot(pt.iso.x - soundIsoPoint.x, pt.iso.y - soundIsoPoint.y);
+      return dist > bestDist ? pt : best;
+    }, translatedPoints[0]);
+
     return {
       index,
       angle,
       cos,
       sin,
-      basePoint,
-      isoBase,
       depth: basePoint.z,
       facing: cos >= 0,
-      points,
+      isoBase: translatedIsoBase,
+      points: translatedPoints,
+      pathIsoPoints,
+      pathSegmentLengths,
+      pathTotalLength,
+      radialIso: radialTarget?.iso || translatedIsoBase,
     };
   });
 
   const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
-
-  const markerCircleRadius = baseRadius + shapeRadius * 0.15;
-  const heightTolerance = Math.max(0.5, shapeRadius * 0.04);
-  const radialTolerance = Math.max(0.5, markerCircleRadius * 0.04);
-
-  const cycleStartPointIndex = (() => {
-    const baseInfo = copyInfos[0];
-    if (!baseInfo) {
-      return null;
-    }
-    const candidate = baseInfo.points
-      .filter((point) => Math.abs(point.world.y) <= heightTolerance)
-      .filter((point) => {
-        const radialDistance = Math.hypot(point.world.x, point.world.z);
-        return Math.abs(radialDistance - markerCircleRadius) <= radialTolerance;
-      })
-      .map((point) => point.pointIndex)
-      .sort((a, b) => a - b)[0];
-    return Number.isInteger(candidate) ? candidate : null;
-  })();
-
-  const stationaryMarkerInfos =
-    cycleStartPointIndex === null
-      ? []
-      : copyInfos
-          .map((info) => {
-            const isCycleStartCopy =
-              jatiSegmentCount > 0 ? info.index % jatiSegmentCount === 0 : true;
-            if (!isCycleStartCopy) {
-              return null;
-            }
-            const matchingPoint = info.points.find((point) => {
-              if (point.pointIndex !== cycleStartPointIndex) {
-                return false;
-              }
-              if (Math.abs(point.world.y) > heightTolerance) {
-                return false;
-              }
-              const radialDistance = Math.hypot(point.world.x, point.world.z);
-              return Math.abs(radialDistance - markerCircleRadius) <= radialTolerance;
-            });
-            if (!matchingPoint) {
-              return null;
-            }
-            return {
-              copyIndex: info.index,
-              iso: matchingPoint.iso,
-              facing: info.facing,
-            };
-          })
-          .filter(Boolean);
-
-  const projectLocalPoint = (angle, point) => {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const radialDistance = baseRadius + point.x;
-    const worldPoint = {
-      x: radialDistance * cos,
-      y: baseLift - point.y,
-      z: radialDistance * sin,
-    };
-    return projectPointIso3d(worldPoint, origin, scale, verticalScale);
-  };
 
   const drawGuideCircle = () => {
     const samples = 84;
@@ -1497,7 +1500,11 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
       const point = projectPointIso3d(
-        { x: baseRadius * cos, y: 0, z: baseRadius * sin },
+        {
+          x: soundCircleRadius * cos,
+          y: baseLift - innerPointLocal.y,
+          z: soundCircleRadius * sin,
+        },
         origin,
         scale,
         verticalScale,
@@ -1563,18 +1570,14 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   }
 
   const drawRadialLine = (info) => {
-    const base = projectLocalPoint(info.angle, {
-      x: 0,
-      y: crossSectionData.maxY,
-    });
     ctx.save();
     ctx.strokeStyle = info.facing
       ? 'rgba(120, 200, 210, 0.55)'
       : 'rgba(30, 54, 64, 0.4)';
     ctx.lineWidth = Math.max(1, canvas.width * 0.0014);
     ctx.beginPath();
-    ctx.moveTo(originPoint.x, originPoint.y);
-    ctx.lineTo(base.x, base.y);
+    ctx.moveTo(soundIsoPoint.x, soundIsoPoint.y);
+    ctx.lineTo(info.radialIso.x, info.radialIso.y);
     ctx.stroke();
     ctx.restore();
   };
@@ -1604,201 +1607,63 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     ctx.restore();
   };
 
-  const safePointCount = Math.max(1, shapePoints.length);
-  const connectors = [];
-  const totalStepCount = copyCount > 0 ? lcm(copyCount, safePointCount) : 0;
-  for (let step = 0; step < totalStepCount; step += 1) {
-    const fromCopyIndex = step % copyCount;
-    const toCopyIndex = (step + 1) % copyCount;
-    const fromPointIndex = step % safePointCount;
-    const toPointIndex = (step + 1) % safePointCount;
-    const fromCopy = copyInfos[fromCopyIndex];
-    const toCopy = copyInfos[toCopyIndex];
-    const fromPoint = fromCopy.points[fromPointIndex % fromCopy.points.length];
-    const toPoint = toCopy.points[toPointIndex % toCopy.points.length];
-    if (!fromPoint || !toPoint) {
-      continue;
-    }
-    connectors.push({
-      step,
-      from: {
-        copyIndex: fromCopyIndex,
-        pointIndex: fromPoint.pointIndex,
-        iso: fromPoint.iso,
-        world: fromPoint.world,
-        facing: fromCopy.facing,
-      },
-      to: {
-        copyIndex: toCopyIndex,
-        pointIndex: toPoint.pointIndex,
-        iso: toPoint.iso,
-        world: toPoint.world,
-        facing: toCopy.facing,
-      },
-      avgDepth: (fromPoint.world.z + toPoint.world.z) / 2,
-    });
-  }
-
-  const drawConnector = (segment, options = {}) => {
-    const {
-      stroke = 'rgba(70, 120, 140, 0.45)',
-      lineWidth = Math.max(1.2, canvas.width * 0.0016),
-    } = options;
-    ctx.save();
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = lineWidth;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(segment.from.iso.x, segment.from.iso.y);
-    ctx.lineTo(segment.to.iso.x, segment.to.iso.y);
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  const connectorsSorted = [...connectors].sort((a, b) => a.avgDepth - b.avgDepth);
-
-  connectorsSorted.forEach((segment) => {
-    const isFront = segment.from.facing || segment.to.facing;
-    const stroke = isFront
-      ? 'rgba(120, 200, 210, 0.55)'
-      : 'rgba(26, 46, 58, 0.38)';
-    drawConnector(segment, { stroke });
-  });
-
-  let activeCopyIndex = -1;
   let movingIsoPoint = null;
-  let activeSegment = null;
-  let overallProgress = 0;
-
-  const stepDuration = segmentDuration > 0
-    ? segmentDuration
-    : safePointCount > 0 && shapeCycle > 0
-      ? shapeCycle / safePointCount
-      : 0;
-
-  if (connectors.length > 0) {
-    const totalDuration = stepDuration * (connectors.length || 1);
-    if (stepDuration > 0 && totalDuration > 0) {
-      const localTime = ((elapsed % totalDuration) + totalDuration) % totalDuration;
-      const scaled = localTime / stepDuration;
-      const stepIndex = Math.floor(scaled) % connectors.length;
-      const stepT = scaled - Math.floor(scaled);
-      activeSegment = connectors[stepIndex];
-      activeCopyIndex = activeSegment.from.copyIndex;
-      const worldPoint = lerp3d(activeSegment.from.world, activeSegment.to.world, stepT);
-      movingIsoPoint = projectPointIso3d(worldPoint, origin, scale, verticalScale);
-      overallProgress = connectors.length > 0 ? (stepIndex + stepT) / connectors.length : 0;
-    } else {
-      activeSegment = connectors[0];
-      activeCopyIndex = activeSegment.from.copyIndex;
-      movingIsoPoint = activeSegment.from.iso;
-      overallProgress = 0;
+  if (copyCycle > 0 && copyInfos[activeCopyIndex]) {
+    const info = copyInfos[activeCopyIndex];
+    const totalLength = info.pathTotalLength;
+    if (totalLength > 0) {
+      const progress = copyElapsed / copyCycle;
+      let distance = Math.max(0, Math.min(1, progress)) * totalLength;
+      for (let i = 0; i < info.pathSegmentLengths.length; i += 1) {
+        const length = info.pathSegmentLengths[i];
+        const from = info.pathIsoPoints[i];
+        const to = info.pathIsoPoints[i + 1];
+        if (!(length > 0)) {
+          continue;
+        }
+        if (distance <= length) {
+          const t = distance / length;
+          movingIsoPoint = {
+            x: from.x + (to.x - from.x) * t,
+            y: from.y + (to.y - from.y) * t,
+          };
+          break;
+        }
+        distance -= length;
+      }
+      if (!movingIsoPoint) {
+        const last = info.pathIsoPoints[info.pathIsoPoints.length - 1];
+        movingIsoPoint = last || info.pathIsoPoints[0];
+      }
     }
-  } else if (shapeCycle > 0) {
-    overallProgress = (elapsed % shapeCycle) / shapeCycle;
   }
 
-  const jatiGroupSize = Math.max(1, jatiSegmentCount);
+  if (!movingIsoPoint && copyInfos[0]) {
+    movingIsoPoint = copyInfos[0].pathIsoPoints[0];
+  }
 
   drawInfos.forEach((info) => {
-    const isGroupStart = info.index % jatiGroupSize === 0;
-    if (!showFullScene && !isGroupStart) {
+    const shouldDraw = showFullScene || info.index === activeCopyIndex;
+    if (!shouldDraw) {
       return;
     }
     drawRadialLine(info);
     drawShape(info, { activeCopyIndex });
   });
 
-  if (activeSegment) {
-    const highlightStroke = 'rgba(231, 111, 81, 0.85)';
-    drawConnector(activeSegment, {
-      stroke: highlightStroke,
-      lineWidth: Math.max(1.8, canvas.width * 0.002),
-    });
-  }
-
   if (movingIsoPoint) {
-    const radius = Math.max(4, canvas.width * 0.0042);
-    ctx.save();
-    ctx.fillStyle = segmentColor;
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = Math.max(1, radius * 0.35);
-    ctx.beginPath();
-    ctx.arc(movingIsoPoint.x, movingIsoPoint.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    drawMarker(movingIsoPoint, {
+      radius: baseMarkerRadius * 1.1,
+      baseOpacity: 0.32,
+    });
   }
 
-  const baseMarkerRadius = Math.max(4, canvas.width * 0.0046);
-
-  const drawMarker = (point, options = {}) => {
-    const {
-      color = segmentColor,
-      stroke = strokeColor,
-      baseOpacity = 0.25,
-      radius = baseMarkerRadius,
-    } = options;
-    ctx.save();
-    if (baseOpacity > 0) {
-      ctx.globalAlpha = baseOpacity;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, radius * 1.7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = Math.max(1, radius * 0.35);
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  const markerAngle = baseAngle + overallProgress * Math.PI * 2;
-  const markerPoint = projectPointIso3d(
-    {
-      x: markerCircleRadius * Math.cos(markerAngle),
-      y: 0,
-      z: markerCircleRadius * Math.sin(markerAngle),
-    },
-    origin,
-    scale,
-    verticalScale,
-  );
-
-  const soundPoint = projectPointIso3d(
-    {
-      x: markerCircleRadius * Math.cos(baseAngle),
-      y: 0,
-      z: markerCircleRadius * Math.sin(baseAngle),
-    },
-    origin,
-    scale,
-    verticalScale,
-  );
-
-  stationaryMarkerInfos.forEach((marker) => {
-    const baseOpacity = marker.facing ? 0.32 : 0.18;
-    drawMarker(marker.iso, {
-      baseOpacity,
-      radius: baseMarkerRadius * 0.8,
-    });
+  drawMarker(soundIsoPoint, {
+    color: 'rgba(255, 255, 255, 0.85)',
+    stroke: 'rgba(255, 255, 255, 0.9)',
+    baseOpacity: 0.18,
+    radius: baseMarkerRadius * 0.75,
   });
-
-  if (showFullScene) {
-    drawMarker(soundPoint, {
-      color: 'rgba(255, 255, 255, 0.85)',
-      stroke: 'rgba(255, 255, 255, 0.9)',
-      baseOpacity: 0.18,
-      radius: baseMarkerRadius * 0.75,
-    });
-
-    drawMarker(markerPoint);
-  }
 }
 
 function drawNadaiQuadrant3d(config, elapsed) {
