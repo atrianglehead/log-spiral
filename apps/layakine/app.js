@@ -20,10 +20,6 @@ const valueLabels = {
 };
 const muteButtons = Array.from(document.querySelectorAll('.mute'));
 const modeButtons = Array.from(document.querySelectorAll('.mode-tab'));
-const jati3dBetaOption = document.querySelector(
-  '.quadrant-option[data-quadrant="jati"]',
-);
-const jati3dBetaCheckbox = document.getElementById('jati-3dbeta-show-all');
 
 const quadrantModes = {
   laya: '1d',
@@ -42,9 +38,6 @@ function setQuadrantMode(quadrant, mode) {
       button.classList.toggle('active', button.dataset.mode === mode);
     }
   });
-  if (quadrant === 'jati' && jati3dBetaOption) {
-    jati3dBetaOption.classList.toggle('visible', mode === '3dbeta');
-  }
 }
 
 modeButtons.forEach((button) => {
@@ -1353,7 +1346,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const baseLift = crossSectionData.maxY;
   const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
   const copyCount = gatiCount;
-  const showFullScene = Boolean(jati3dBetaCheckbox?.checked);
+  const showFullScene = true;
 
   const segmentDuration = view2d.segmentDuration || 0;
   const cycleSegments = view2d.segmentCount || 1;
@@ -1490,84 +1483,6 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   });
 
   const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
-
-  const drawGuideCircle = () => {
-    const samples = 84;
-    const front = [];
-    const back = [];
-    for (let i = 0; i <= samples; i += 1) {
-      const angle = baseAngle + (i / samples) * Math.PI * 2;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const point = projectPointIso3d(
-        {
-          x: soundCircleRadius * cos,
-          y: baseLift - innerPointLocal.y,
-          z: soundCircleRadius * sin,
-        },
-        origin,
-        scale,
-        verticalScale,
-      );
-      if (cos >= 0) {
-        front.push(point);
-      } else {
-        back.push(point);
-      }
-    }
-
-    const drawPolyline = (points, style) => {
-      if (!points.length) {
-        return;
-      }
-      ctx.save();
-      ctx.strokeStyle = style.stroke;
-      ctx.lineWidth = style.lineWidth;
-      ctx.globalAlpha = style.alpha;
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i += 1) {
-        ctx.lineTo(points[i].x, points[i].y);
-      }
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    const backStyle = {
-      stroke: 'rgba(18, 34, 44, 0.7)',
-      lineWidth: Math.max(1.2, canvas.width * 0.0014),
-      alpha: 0.9,
-    };
-    const frontStyle = {
-      stroke: 'rgba(88, 160, 180, 0.6)',
-      lineWidth: Math.max(1.4, canvas.width * 0.0018),
-      alpha: 0.95,
-    };
-
-    drawPolyline(back, backStyle);
-    drawPolyline(front, frontStyle);
-
-    ctx.save();
-    ctx.beginPath();
-    for (let i = 0; i < front.length; i += 1) {
-      if (i === 0) {
-        ctx.moveTo(front[i].x, front[i].y);
-      } else {
-        ctx.lineTo(front[i].x, front[i].y);
-      }
-    }
-    for (let i = back.length - 1; i >= 0; i -= 1) {
-      ctx.lineTo(back[i].x, back[i].y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(10, 28, 34, 0.32)';
-    ctx.fill();
-    ctx.restore();
-  };
-
-  if (showFullScene) {
-    drawGuideCircle();
-  }
 
   const drawRadialLine = (info) => {
     ctx.save();
