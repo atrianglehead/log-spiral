@@ -15,6 +15,10 @@ const addBtn = document.getElementById('add');
 const f0Btn = document.getElementById('f0drone');
 const volumeSlider = document.getElementById('volume');
 
+const KEY_SEQUENCE = 'qwertyuiopasdfghjklzxcvbnm';
+const keyToPitch = new Map();
+const activeKeyPitches = new Map();
+
 const SHRUTI_DATA = [
   { code: 'S', name: 'Shadja', ratio: '1/1' },
   { code: 'r1', name: 'Atikom Rishabh (Lower)', ratio: '256/243' },
@@ -289,6 +293,25 @@ function updatePitchControlColor(p) {
   if (p._meta) p._meta.style.color = color;
 }
 
+function displayKeyLabel(key) {
+  if (!key) return '';
+  if (key === ' ') return 'Space';
+  return key.length === 1 ? key.toUpperCase() : key;
+}
+
+function assignKeyboardShortcuts(sorted) {
+  keyToPitch.clear();
+  for (let i = 0; i < sorted.length; i += 1) {
+    const p = sorted[i];
+    const key = KEY_SEQUENCE[i] || null;
+    p._key = key;
+    if (key) {
+      const normalizedKey = key.toLowerCase();
+      keyToPitch.set(normalizedKey, p);
+    }
+  }
+}
+
 function isPitchEnabled(p) {
   if (p.muted) return false;
   const soloActive = pitches.some(q => q.solo);
@@ -417,6 +440,7 @@ function findMatchingShruti(angle) {
 
 function refreshPitchLabels() {
   const sorted = [...pitches].sort((a,b) => angleFor(a) - angleFor(b));
+  assignKeyboardShortcuts(sorted);
   let serial = 0;
   for (const p of sorted) {
     const label = p._label;
@@ -424,11 +448,12 @@ function refreshPitchLabels() {
     if (!label && !meta) continue;
     const ang = normalizeAngle(angleFor(p));
     const shruti = findMatchingShruti(ang);
+    const keyLabel = p._key ? `[${displayKeyLabel(p._key)}] ` : '';
     if (label) {
       if (shruti) {
-        label.textContent = shruti.title;
+        label.innerHTML = `${keyLabel}${shruti.title}`;
       } else {
-        label.innerHTML = `f<sub>${serial}</sub>`;
+        label.innerHTML = `${keyLabel}f<sub>${serial}</sub>`;
         serial += 1;
       }
     }
@@ -447,7 +472,15 @@ function refreshPitchLabels() {
 function removePitch(id) {
   const idx = pitches.findIndex(p => p.id === id);
   if (idx > 0) {
-    pitches.splice(idx,1);
+    const [removed] = pitches.splice(idx,1);
+    if (removed) {
+      stopPitchSound(removed);
+      for (const [key, pitch] of [...activeKeyPitches.entries()]) {
+        if (pitch === removed) {
+          activeKeyPitches.delete(key);
+        }
+      }
+    }
     updateControls();
     draw();
   }
@@ -504,6 +537,7 @@ function stopTonicSound() {
 function startPitchSound(p) {
   if (playing) return;
   if (!isPitchEnabled(p)) return;
+  if (p._osc) return;
   const ctx = ensureAudio();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -525,6 +559,62 @@ function stopPitchSound(p) {
   p._osc.stop(ctx.currentTime + FADE_MS / 1000);
   p._osc = null; p._gain = null;
 }
+
+function normalizeKey(key) {
+  if (!key) return null;
+  if (key === ' ') return ' ';
+  if (key.length === 1) return key.toLowerCase();
+  return null;
+}
+
+function shouldHandleKeyEvent(e) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return false;
+  const target = e.target;
+  if (!target) return true;
+  if (target.isContentEditable) return false;
+  const tag = target.tagName;
+  if (!tag) return true;
+  const upper = tag.toUpperCase();
+  return upper !== 'INPUT' && upper !== 'TEXTAREA' && upper !== 'SELECT';
+}
+
+function handleKeyDown(e) {
+  if (!shouldHandleKeyEvent(e)) return;
+  const key = normalizeKey(e.key);
+  if (!key) return;
+  const pitch = keyToPitch.get(key);
+  if (!pitch) return;
+  if (activeKeyPitches.has(key) && e.repeat) {
+    e.preventDefault();
+    return;
+  }
+  if (activeKeyPitches.has(key)) return;
+  e.preventDefault();
+  startPitchSound(pitch);
+  if (pitch._osc) {
+    activeKeyPitches.set(key, pitch);
+  }
+}
+
+function handleKeyUp(e) {
+  const key = normalizeKey(e.key);
+  if (!key) return;
+  const pitch = activeKeyPitches.get(key);
+  if (!pitch) return;
+  stopPitchSound(pitch);
+  activeKeyPitches.delete(key);
+}
+
+function releaseAllKeys() {
+  for (const pitch of activeKeyPitches.values()) {
+    stopPitchSound(pitch);
+  }
+  activeKeyPitches.clear();
+}
+
+document.addEventListener('keydown', handleKeyDown);
+document.addEventListener('keyup', handleKeyUp);
+window.addEventListener('blur', releaseAllKeys);
 
 function updateDrone() {
   if (f0DroneOn) {
@@ -673,6 +763,7 @@ playBtn.addEventListener('click', () => {
   if (playing) {
     stopPlayback();
   } else {
+    releaseAllKeys();
     playing = true;
     playBtn.textContent = '■';
     startSequential();
