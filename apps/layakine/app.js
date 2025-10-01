@@ -1396,11 +1396,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   });
 
   const sortedInfos = copyInfos.sort((a, b) => a.depth - b.depth);
-  const drawInfos = showFullScene
-    ? sortedInfos
-    : sortedInfos.filter((info) =>
-        info.index === (activeCopyIndex === -1 ? 0 : activeCopyIndex),
-      );
+  const drawInfos = sortedInfos;
 
   const pathSegments = [];
   let totalPathLength = 0;
@@ -1513,7 +1509,9 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     ctx.restore();
   };
 
-  drawGuideCircle();
+  if (showFullScene) {
+    drawGuideCircle();
+  }
 
   const drawRadialLine = (info) => {
     const base = projectLocalPoint(info.angle, {
@@ -1572,7 +1570,9 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   };
 
   drawInfos.forEach((info) => {
-    drawRadialLine(info);
+    if (showFullScene) {
+      drawRadialLine(info);
+    }
     drawShape(info);
   });
 
@@ -1627,14 +1627,16 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     verticalScale,
   );
 
-  drawMarker(soundPoint, {
-    color: 'rgba(255, 255, 255, 0.85)',
-    stroke: 'rgba(255, 255, 255, 0.9)',
-    baseOpacity: 0.18,
-    radius: baseMarkerRadius * 0.75,
-  });
+  if (showFullScene) {
+    drawMarker(soundPoint, {
+      color: 'rgba(255, 255, 255, 0.85)',
+      stroke: 'rgba(255, 255, 255, 0.9)',
+      baseOpacity: 0.18,
+      radius: baseMarkerRadius * 0.75,
+    });
 
-  drawMarker(markerPoint);
+    drawMarker(markerPoint);
+  }
 }
 
 function drawNadaiQuadrant3d(config, elapsed) {
