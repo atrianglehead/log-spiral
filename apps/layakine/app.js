@@ -1316,7 +1316,7 @@ function drawJatiQuadrant3d(config, elapsed) {
 }
 
 function drawJatiQuadrant3dBeta(config, elapsed) {
-  const { orientation, view2d, cycleDuration } = config;
+  const { orientation, view2d, cycleDuration, gatiCount: rawGatiCount = 1 } = config;
   if (!view2d) {
     return;
   }
@@ -1334,7 +1334,9 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const segmentColor = getSegmentColor('jati');
   const scale = (Math.min(width, height) * 0.32) / (majorRadius + minorRadius);
   const verticalScale = scale * 0.92;
-  const slices = 56;
+  const jatiSegmentCount = Math.max(1, Math.floor(view2d.segmentCount || 1));
+  const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
+  const slices = Math.max(1, gatiCount * jatiSegmentCount);
 
   const projectProfile = (angle) => {
     const cos = Math.cos(angle);
@@ -2126,6 +2128,7 @@ function drawQuadrant(name, config, elapsed) {
         orientation,
         view2d,
         cycleDuration,
+        gatiCount: config.gatiCount,
       }, elapsed);
     }
     return;
