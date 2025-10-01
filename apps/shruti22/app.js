@@ -15,7 +15,11 @@ const addBtn = document.getElementById('add');
 const f0Btn = document.getElementById('f0drone');
 const volumeSlider = document.getElementById('volume');
 
-const KEY_SEQUENCE = 'qwertyuiopasdfghjklzxcvbnm';
+const KEY_SEQUENCE = [
+  'KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP',
+  'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK', 'KeyL',
+  'KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM'
+];
 const keyToPitch = new Map();
 const activeKeyPitches = new Map();
 
@@ -293,10 +297,12 @@ function updatePitchControlColor(p) {
   if (p._meta) p._meta.style.color = color;
 }
 
-function displayKeyLabel(key) {
-  if (!key) return '';
-  if (key === ' ') return 'Space';
-  return key.length === 1 ? key.toUpperCase() : key;
+function displayKeyLabel(code) {
+  if (!code) return '';
+  if (code === 'Space') return 'Space';
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  return code;
 }
 
 function assignKeyboardShortcuts(sorted) {
@@ -306,8 +312,7 @@ function assignKeyboardShortcuts(sorted) {
     const key = KEY_SEQUENCE[i] || null;
     p._key = key;
     if (key) {
-      const normalizedKey = key.toLowerCase();
-      keyToPitch.set(normalizedKey, p);
+      keyToPitch.set(key, p);
     }
   }
 }
@@ -560,11 +565,9 @@ function stopPitchSound(p) {
   p._osc = null; p._gain = null;
 }
 
-function normalizeKey(key) {
-  if (!key) return null;
-  if (key === ' ') return ' ';
-  if (key.length === 1) return key.toLowerCase();
-  return null;
+function normalizeKey(code) {
+  if (!code) return null;
+  return code;
 }
 
 function shouldHandleKeyEvent(e) {
@@ -580,7 +583,7 @@ function shouldHandleKeyEvent(e) {
 
 function handleKeyDown(e) {
   if (!shouldHandleKeyEvent(e)) return;
-  const key = normalizeKey(e.key);
+  const key = normalizeKey(e.code);
   if (!key) return;
   const pitch = keyToPitch.get(key);
   if (!pitch) return;
@@ -597,7 +600,7 @@ function handleKeyDown(e) {
 }
 
 function handleKeyUp(e) {
-  const key = normalizeKey(e.key);
+  const key = normalizeKey(e.code);
   if (!key) return;
   const pitch = activeKeyPitches.get(key);
   if (!pitch) return;
