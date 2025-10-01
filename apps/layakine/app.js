@@ -546,21 +546,29 @@ function projectPointIso3d(point, origin, scale, verticalScale = 1) {
 
 function buildJatiCrossSection(view2d, radius) {
   if (!view2d) {
-    return [];
+    return { points: [], minY: 0, maxY: 0 };
   }
 
-  const alignBasePlane = (points) => {
+  const normalizePoints = (points) => {
     if (!points.length) {
-      return points;
+      return { points: [], minY: 0, maxY: 0 };
     }
-    const minY = points.reduce(
-      (lowest, point) => (point.y < lowest ? point.y : lowest),
-      Number.POSITIVE_INFINITY,
-    );
-    if (!Number.isFinite(minY) || Math.abs(minY) < 1e-9) {
-      return points;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    points.forEach((point) => {
+      if (point.y < minY) {
+        minY = point.y;
+      }
+      if (point.y > maxY) {
+        maxY = point.y;
+      }
+    });
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+      return { points, minY: 0, maxY: 0 };
     }
-    return points.map((point) => ({ x: point.x, y: point.y - minY }));
+    const midY = (minY + maxY) / 2;
+    const normalized = points.map((point) => ({ x: point.x, y: point.y - midY }));
+    return { points: normalized, minY: minY - midY, maxY: maxY - midY };
   };
 
   if (view2d.shape === 'circle') {
@@ -570,13 +578,13 @@ function buildJatiCrossSection(view2d, radius) {
       const angle = (i / segments) * Math.PI * 2;
       points.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
     }
-    return alignBasePlane(points);
+    return normalizePoints(points);
   }
 
   if (view2d.shape === 'line') {
     const halfLength = radius;
     const thickness = Math.max(radius * 0.28, 6);
-    return alignBasePlane([
+    return normalizePoints([
       { x: -halfLength, y: -thickness },
       { x: halfLength, y: -thickness },
       { x: halfLength, y: thickness },
@@ -592,10 +600,10 @@ function buildJatiCrossSection(view2d, radius) {
       const angle = rotation + (i * 2 * Math.PI) / sides;
       points.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
     }
-    return alignBasePlane(points);
+    return normalizePoints(points);
   }
 
-  return [];
+  return { points: [], minY: 0, maxY: 0 };
 }
 
 function drawGatiQuadrant3d(config, elapsed) {
@@ -1332,7 +1340,8 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const baseCenter = { x: offsetX + width * 0.63, y: offsetY + height * 0.66 };
   const majorRadius = Math.min(width, height) * 0.24;
   const minorRadius = Math.min(width, height) * 0.12;
-  const crossSection = buildJatiCrossSection(view2d, minorRadius);
+  const crossSectionData = buildJatiCrossSection(view2d, minorRadius);
+  const crossSection = crossSectionData.points;
   if (crossSection.length < 3) {
     return;
   }
@@ -1344,24 +1353,25 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   const jatiSegmentCount = Math.max(1, Math.floor(view2d.segmentCount || 1));
   const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
   const slices = Math.max(1, gatiCount * jatiSegmentCount);
+  const baseLift = -crossSectionData.minY;
 
-  const projectProfile = (angle) => {
+  const projectSliceProfile = (angle) => {
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
-    return crossSection.map((point) => {
-      const radial = majorRadius + point.x;
-      const projected = projectPointIso3d(
+    const offsetX = majorRadius * cos;
+    const offsetZ = majorRadius * sin;
+    return crossSection.map((point) =>
+      projectPointIso3d(
         {
-          x: radial * cos,
-          y: point.y,
-          z: radial * sin,
+          x: offsetX + point.x,
+          y: baseLift + point.y,
+          z: offsetZ,
         },
         baseCenter,
         scale,
         verticalScale,
-      );
-      return projected;
-    });
+      ),
+    );
   };
 
   const radialValues = crossSection.map((point) => point.x);
@@ -1377,128 +1387,118 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   }
   const showFullScene = Boolean(jati3dBetaCheckbox?.checked);
 
-  if (!showFullScene) {
-    const activeSlice =
-      shapeCycle > 0 ? Math.floor(progress * slices) % slices : -1;
-    const outlineWidth = Math.max(1.1, canvas.width * 0.0014);
-    const sliceProfiles = [];
-    for (let i = 0; i < slices; i += 1) {
-      const angle = (i / slices) * Math.PI * 2;
-      sliceProfiles.push({
-        profile: projectProfile(angle),
-        facing: Math.cos(angle) > 0,
-        index: i,
-      });
-    }
+  const outlineWidth = Math.max(1.1, canvas.width * 0.0014);
 
-    const drawSlice = ({ profile, facing, index }) => {
-      if (!profile.length) {
-        return;
-      }
-      const isActive = index === activeSlice;
-      const fill = isActive
-        ? 'rgba(231, 111, 81, 0.36)'
-        : facing
-        ? 'rgba(231, 111, 81, 0.18)'
-        : 'rgba(231, 111, 81, 0.08)';
-      const stroke = isActive
-        ? 'rgba(231, 111, 81, 0.95)'
-        : facing
-        ? 'rgba(231, 111, 81, 0.55)'
-        : 'rgba(231, 111, 81, 0.32)';
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(profile[0].x, profile[0].y);
-      for (let i = 1; i < profile.length; i += 1) {
-        ctx.lineTo(profile[i].x, profile[i].y);
-      }
-      ctx.closePath();
-      ctx.fillStyle = fill;
-      ctx.fill();
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = isActive ? outlineWidth * 1.4 : outlineWidth;
-      ctx.stroke();
-      ctx.restore();
+  const buildSliceInfo = (index) => {
+    const angle = (index / slices) * Math.PI * 2;
+    const offsetX = majorRadius * Math.cos(angle);
+    const offsetZ = majorRadius * Math.sin(angle);
+    const isoBase = projectPointIso3d(
+      { x: offsetX, y: 0, z: offsetZ },
+      baseCenter,
+      scale,
+      verticalScale,
+    );
+    return {
+      index,
+      angle,
+      depth: isoBase.y,
+      facing: offsetZ >= 0,
+      profile: projectSliceProfile(angle),
     };
+  };
 
-    sliceProfiles
-      .filter((slice) => !slice.facing)
-      .forEach((slice) => drawSlice(slice));
-    sliceProfiles
-      .filter((slice) => slice.facing)
-      .forEach((slice) => drawSlice(slice));
+  const sliceInfos = Array.from({ length: slices }, (_, index) => buildSliceInfo(index));
+  const activeSlice =
+    shapeCycle > 0 ? Math.floor(progress * slices) % slices : -1;
 
-    return;
-  }
-
-  const surfaceBands = [];
-  for (let i = 0; i < slices; i += 1) {
-    const angleA = (i / slices) * Math.PI * 2;
-    const angleB = ((i + 1) / slices) * Math.PI * 2;
-    const profileA = projectProfile(angleA);
-    const profileB = projectProfile(angleB);
-    const midpoint = (angleA + angleB) / 2;
-    const facing = Math.cos(midpoint) > 0;
-    const shade = 0.5 + 0.5 * Math.cos(midpoint - Math.PI / 2);
-    surfaceBands.push({
-      polygon: [...profileA, ...profileB.slice().reverse()],
-      facing,
-      shade,
-    });
-  }
-
-  const drawPolygonSurface = (points, options = {}) => {
-    if (!points.length) {
+  const drawSliceProfile = (info, options = {}) => {
+    const { profile } = info;
+    if (!profile.length) {
       return;
     }
     const {
-      fill = 'rgba(48, 92, 108, 1)',
-      alpha = 0.3,
-      stroke = strokeColor,
-      lineWidth = Math.max(1, canvas.width * 0.0012),
+      fill,
+      stroke,
+      lineWidth = outlineWidth,
+      alpha = 1,
     } = options;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i += 1) {
-      ctx.lineTo(points[i].x, points[i].y);
+    ctx.moveTo(profile[0].x, profile[0].y);
+    for (let i = 1; i < profile.length; i += 1) {
+      ctx.lineTo(profile[i].x, profile[i].y);
     }
     ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
+    if (fill) {
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
     ctx.restore();
   };
 
-  surfaceBands
-    .filter((band) => !band.facing)
-    .forEach((band) =>
-      drawPolygonSurface(band.polygon, {
-        fill: 'rgba(22, 40, 52, 1)',
-        alpha: 0.24 + band.shade * 0.12,
-        lineWidth: Math.max(1, canvas.width * 0.0009),
-      }),
-    );
+  if (!showFullScene) {
+    const backSlices = sliceInfos
+      .filter((slice) => slice.depth < 0)
+      .sort((a, b) => a.depth - b.depth);
+    const frontSlices = sliceInfos
+      .filter((slice) => slice.depth >= 0)
+      .sort((a, b) => a.depth - b.depth);
 
-  surfaceBands
-    .filter((band) => band.facing)
-    .forEach((band) =>
-      drawPolygonSurface(band.polygon, {
-        fill: 'rgba(72, 156, 172, 1)',
-        alpha: 0.32 + band.shade * 0.28,
-        lineWidth: Math.max(1.2, canvas.width * 0.0014),
-      }),
-    );
+    const drawFilledSlice = (info) => {
+      const isActive = info.index === activeSlice;
+      const fill = isActive
+        ? 'rgba(231, 111, 81, 0.36)'
+        : info.facing
+        ? 'rgba(231, 111, 81, 0.22)'
+        : 'rgba(231, 111, 81, 0.08)';
+      const stroke = isActive
+        ? 'rgba(231, 111, 81, 0.95)'
+        : info.facing
+        ? 'rgba(231, 111, 81, 0.6)'
+        : 'rgba(231, 111, 81, 0.28)';
+      const width = isActive ? outlineWidth * 1.4 : outlineWidth;
+      drawSliceProfile(info, { fill, stroke, lineWidth: width });
+    };
 
-  const frontProfile = projectProfile(0);
-  drawPolygonSurface(frontProfile, {
-    fill: 'rgba(88, 208, 216, 1)',
-    alpha: 0.18,
-    lineWidth: Math.max(1.2, canvas.width * 0.0016),
-  });
+    backSlices.forEach((slice) => drawFilledSlice(slice));
+    frontSlices.forEach((slice) => drawFilledSlice(slice));
+
+    return;
+  }
+
+  const backSlices = sliceInfos
+    .filter((slice) => slice.depth < 0)
+    .sort((a, b) => a.depth - b.depth);
+  const frontSlices = sliceInfos
+    .filter((slice) => slice.depth >= 0)
+    .sort((a, b) => a.depth - b.depth);
+
+  const drawSceneSlice = (info) => {
+    const shade = 0.5 + 0.5 * Math.cos(info.angle);
+    const isActive = info.index === activeSlice;
+    const fill = isActive
+      ? 'rgba(88, 208, 216, 0.32)'
+      : info.facing
+      ? `rgba(72, 156, 172, ${0.26 + shade * 0.28})`
+      : `rgba(22, 40, 52, ${0.18 + (1 - shade) * 0.18})`;
+    const stroke = info.facing
+      ? 'rgba(231, 244, 255, 0.26)'
+      : 'rgba(12, 24, 32, 0.3)';
+    const width = isActive
+      ? Math.max(outlineWidth * 1.4, canvas.width * 0.0018)
+      : Math.max(outlineWidth, canvas.width * 0.0012);
+    drawSliceProfile(info, { fill, stroke, lineWidth: width });
+  };
+
+  backSlices.forEach((slice) => drawSceneSlice(slice));
+  frontSlices.forEach((slice) => drawSceneSlice(slice));
 
   const drawRingOutline = (radiusOffset, options = {}) => {
     const {
