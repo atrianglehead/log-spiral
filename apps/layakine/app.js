@@ -20,6 +20,10 @@ const valueLabels = {
 };
 const muteButtons = Array.from(document.querySelectorAll('.mute'));
 const modeButtons = Array.from(document.querySelectorAll('.mode-tab'));
+const jati3dBetaOption = document.querySelector(
+  '.quadrant-option[data-quadrant="jati"]',
+);
+const jati3dBetaCheckbox = document.getElementById('jati-3dbeta-show-all');
 
 const quadrantModes = {
   laya: '1d',
@@ -38,6 +42,9 @@ function setQuadrantMode(quadrant, mode) {
       button.classList.toggle('active', button.dataset.mode === mode);
     }
   });
+  if (quadrant === 'jati' && jati3dBetaOption) {
+    jati3dBetaOption.classList.toggle('visible', mode === '3dbeta');
+  }
 }
 
 modeButtons.forEach((button) => {
@@ -1357,6 +1364,73 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     });
   };
 
+  const radialValues = crossSection.map((point) => point.x);
+  const outerRadius = Math.max(...radialValues);
+  const innerRadius = Math.min(...radialValues);
+  const cycleSegments = view2d.segmentCount || 1;
+  const segmentDuration = view2d.segmentDuration || 0;
+  const fallbackCycle = segmentDuration * Math.max(1, cycleSegments);
+  const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
+  let progress = 0;
+  if (shapeCycle > 0) {
+    progress = (elapsed % shapeCycle) / shapeCycle;
+  }
+  const showFullScene = Boolean(jati3dBetaCheckbox?.checked);
+
+  if (!showFullScene) {
+    const activeSlice =
+      shapeCycle > 0 ? Math.floor(progress * slices) % slices : -1;
+    const outlineWidth = Math.max(1.1, canvas.width * 0.0014);
+    const sliceProfiles = [];
+    for (let i = 0; i < slices; i += 1) {
+      const angle = (i / slices) * Math.PI * 2;
+      sliceProfiles.push({
+        profile: projectProfile(angle),
+        facing: Math.cos(angle) > 0,
+        index: i,
+      });
+    }
+
+    const drawSlice = ({ profile, facing, index }) => {
+      if (!profile.length) {
+        return;
+      }
+      const isActive = index === activeSlice;
+      const fill = isActive
+        ? 'rgba(231, 111, 81, 0.36)'
+        : facing
+        ? 'rgba(231, 111, 81, 0.18)'
+        : 'rgba(231, 111, 81, 0.08)';
+      const stroke = isActive
+        ? 'rgba(231, 111, 81, 0.95)'
+        : facing
+        ? 'rgba(231, 111, 81, 0.55)'
+        : 'rgba(231, 111, 81, 0.32)';
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(profile[0].x, profile[0].y);
+      for (let i = 1; i < profile.length; i += 1) {
+        ctx.lineTo(profile[i].x, profile[i].y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = isActive ? outlineWidth * 1.4 : outlineWidth;
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    sliceProfiles
+      .filter((slice) => !slice.facing)
+      .forEach((slice) => drawSlice(slice));
+    sliceProfiles
+      .filter((slice) => slice.facing)
+      .forEach((slice) => drawSlice(slice));
+
+    return;
+  }
+
   const surfaceBands = [];
   for (let i = 0; i < slices; i += 1) {
     const angleA = (i / slices) * Math.PI * 2;
@@ -1426,10 +1500,6 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     lineWidth: Math.max(1.2, canvas.width * 0.0016),
   });
 
-  const radialValues = crossSection.map((point) => point.x);
-  const outerRadius = Math.max(...radialValues);
-  const innerRadius = Math.min(...radialValues);
-
   const drawRingOutline = (radiusOffset, options = {}) => {
     const {
       alpha = 0.3,
@@ -1497,15 +1567,6 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     lineWidth: Math.max(1.2, canvas.width * 0.0016),
     facingOnly: false,
   });
-
-  const cycleSegments = view2d.segmentCount || 1;
-  const segmentDuration = view2d.segmentDuration || 0;
-  const fallbackCycle = segmentDuration * Math.max(1, cycleSegments);
-  const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
-  let progress = 0;
-  if (shapeCycle > 0) {
-    progress = (elapsed % shapeCycle) / shapeCycle;
-  }
 
   const outerRadial = majorRadius + outerRadius;
   const baseAngle = -Math.PI / 2;

@@ -168,6 +168,37 @@
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
       backdrop-filter: blur(6px);
     }
+    .quadrant-option {
+      position: absolute;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: rgba(10, 12, 16, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 8px 12px;
+      color: #f4f4f4;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      z-index: 3;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(6px);
+    }
+    .quadrant-option.visible {
+      display: inline-flex;
+    }
+    .quadrant-option label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .quadrant-option input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #e76f51;
+    }
     .quadrant-tabs button {
       background: transparent;
       border: none;
@@ -195,6 +226,10 @@
     .quadrant-tabs.top-right {
       top: 24px;
       left: calc(50% + 24px);
+    }
+    .quadrant-option.top-right {
+      top: 80px;
+      left: calc(50% + 28px);
     }
     .quadrant-tabs.bottom-left {
       top: calc(50% + 24px);
@@ -266,6 +301,10 @@
         top: 16px;
         left: calc(50% + 12px);
       }
+      .quadrant-option.top-right {
+        top: 68px;
+        left: calc(50% + 16px);
+      }
       .quadrant-tabs.bottom-left {
         top: calc(50% + 12px);
         left: 16px;
@@ -305,6 +344,12 @@
         <button class="mode-tab" data-quadrant="jati" data-mode="2d" type="button">2D</button>
         <button class="mode-tab" data-quadrant="jati" data-mode="3d" type="button">3D</button>
         <button class="mode-tab" data-quadrant="jati" data-mode="3dbeta" type="button">3Dbeta</button>
+      </div>
+      <div class="quadrant-option top-right" data-quadrant="jati">
+        <label for="jati-3dbeta-show-all">
+          <input id="jati-3dbeta-show-all" type="checkbox" />
+          Show full scene
+        </label>
       </div>
       <div class="quadrant-tabs bottom-left" data-quadrant="laya">
         <button class="mode-tab" data-quadrant="laya" data-mode="1d" type="button">1D</button>
