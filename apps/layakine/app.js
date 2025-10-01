@@ -1379,11 +1379,21 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     (bestIndex, point, index) => (point.x < shapePoints[bestIndex].x ? index : bestIndex),
     0,
   );
-  const innerPointLocal = shapePoints[innerPointIndex];
-  const soundCircleRadius = baseRadius + innerPointLocal.x;
+  const epsilon = 1e-6;
+  const innerPointLocalX = shapePoints[innerPointIndex]?.x ?? 0;
+  const innerPointCandidates = shapePoints
+    .map((pt, index) => ({ pt, index }))
+    .filter(({ pt }) => Math.abs(pt.x - innerPointLocalX) < epsilon);
+  const averagedInnerY =
+    innerPointCandidates.length > 0
+      ?
+        innerPointCandidates.reduce((sum, { pt }) => sum + pt.y, 0) /
+        innerPointCandidates.length
+      : shapePoints[innerPointIndex]?.y ?? 0;
+  const soundCircleRadius = baseRadius + innerPointLocalX;
   const soundWorldPoint = {
     x: soundCircleRadius * Math.cos(baseAngle),
-    y: baseLift - innerPointLocal.y,
+    y: baseLift - averagedInnerY,
     z: soundCircleRadius * Math.sin(baseAngle),
   };
   let soundIsoPoint = projectPointIso3d(soundWorldPoint, origin, scale, verticalScale);
@@ -1439,11 +1449,22 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       };
     });
 
-    const innerPoint = points[innerPointIndex];
-    const offset = innerPoint
+    const innerPointIsos = points.filter((pt) => Math.abs(pt.local.x - innerPointLocalX) < epsilon);
+    let referenceIso = null;
+    if (innerPointIsos.length > 0) {
+      const sum = innerPointIsos.reduce(
+        (acc, pt) => ({ x: acc.x + pt.iso.x, y: acc.y + pt.iso.y }),
+        { x: 0, y: 0 },
+      );
+      referenceIso = { x: sum.x / innerPointIsos.length, y: sum.y / innerPointIsos.length };
+    } else if (points[innerPointIndex]) {
+      referenceIso = points[innerPointIndex].iso;
+    }
+
+    const offset = referenceIso
       ? {
-          x: soundIsoPoint.x - innerPoint.iso.x,
-          y: soundIsoPoint.y - innerPoint.iso.y,
+          x: soundIsoPoint.x - referenceIso.x,
+          y: soundIsoPoint.y - referenceIso.y,
         }
       : { x: 0, y: 0 };
 
