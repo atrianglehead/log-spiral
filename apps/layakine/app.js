@@ -1337,209 +1337,141 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
   }
 
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
-  const baseCenter = { x: offsetX + width * 0.63, y: offsetY + height * 0.66 };
-  const majorRadius = Math.min(width, height) * 0.24;
-  const minorRadius = Math.min(width, height) * 0.12;
-  const crossSectionData = buildJatiCrossSection(view2d, minorRadius);
-  const crossSection = crossSectionData.points;
-  if (crossSection.length < 3) {
+  const origin = { x: offsetX + width * 0.63, y: offsetY + height * 0.68 };
+  const baseRadius = Math.min(width, height) * 0.22;
+  const shapeRadius = baseRadius * 0.55;
+  const crossSectionData = buildJatiCrossSection(view2d, shapeRadius);
+  const shapePoints = crossSectionData.points;
+  if (shapePoints.length < 2) {
     return;
   }
 
   const strokeColor = getStrokeColor('jati');
   const segmentColor = getSegmentColor('jati');
-  const scale = (Math.min(width, height) * 0.32) / (majorRadius + minorRadius);
-  const verticalScale = scale * 0.92;
+  const scale = 1;
+  const verticalScale = 0.9;
+  const baseLift = -crossSectionData.minY;
   const jatiSegmentCount = Math.max(1, Math.floor(view2d.segmentCount || 1));
   const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
-  const slices = Math.max(1, gatiCount * jatiSegmentCount);
-  const baseLift = -crossSectionData.minY;
+  const copyCount = Math.max(1, gatiCount * jatiSegmentCount);
+  const showFullScene = Boolean(jati3dBetaCheckbox?.checked);
 
-  const projectSliceProfile = (angle) => {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const offsetX = majorRadius * cos;
-    const offsetZ = majorRadius * sin;
-    return crossSection.map((point) =>
-      projectPointIso3d(
-        {
-          x: offsetX + point.x,
-          y: baseLift + point.y,
-          z: offsetZ,
-        },
-        baseCenter,
-        scale,
-        verticalScale,
-      ),
-    );
-  };
-
-  const radialValues = crossSection.map((point) => point.x);
-  const outerRadius = Math.max(...radialValues);
-  const innerRadius = Math.min(...radialValues);
   const cycleSegments = view2d.segmentCount || 1;
   const segmentDuration = view2d.segmentDuration || 0;
   const fallbackCycle = segmentDuration * Math.max(1, cycleSegments);
   const shapeCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
-  let progress = 0;
+
+  let overallProgress = 0;
   if (shapeCycle > 0) {
-    progress = (elapsed % shapeCycle) / shapeCycle;
+    overallProgress = (elapsed % shapeCycle) / shapeCycle;
   }
-  const showFullScene = Boolean(jati3dBetaCheckbox?.checked);
 
-  const outlineWidth = Math.max(1.1, canvas.width * 0.0014);
+  let activeCopyIndex = -1;
+  let copyProgress = 0;
+  if (copyCount > 0 && shapeCycle > 0) {
+    const scaled = overallProgress * copyCount;
+    activeCopyIndex = Math.floor(scaled) % copyCount;
+    copyProgress = scaled - Math.floor(scaled);
+  }
 
-  const buildSliceInfo = (index) => {
-    const angle = (index / slices) * Math.PI * 2;
-    const offsetX = majorRadius * Math.cos(angle);
-    const offsetZ = majorRadius * Math.sin(angle);
-    const isoBase = projectPointIso3d(
-      { x: offsetX, y: 0, z: offsetZ },
-      baseCenter,
-      scale,
-      verticalScale,
-    );
+  const baseAngle = -Math.PI / 2;
+  const originPoint = projectPointIso3d({ x: 0, y: 0, z: 0 }, origin, scale, verticalScale);
+
+  const copyInfos = Array.from({ length: copyCount }, (_, index) => {
+    const angle = baseAngle + (index / copyCount) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const basePoint = { x: cos * baseRadius, y: 0, z: sin * baseRadius };
+    const isoBase = projectPointIso3d(basePoint, origin, scale, verticalScale);
     return {
       index,
       angle,
-      depth: isoBase.y,
-      facing: offsetZ >= 0,
-      profile: projectSliceProfile(angle),
+      cos,
+      sin,
+      basePoint,
+      isoBase,
+      depth: basePoint.z,
+      facing: cos >= 0,
     };
-  };
+  });
 
-  const sliceInfos = Array.from({ length: slices }, (_, index) => buildSliceInfo(index));
-  const activeSlice =
-    shapeCycle > 0 ? Math.floor(progress * slices) % slices : -1;
+  const sortedInfos = copyInfos.sort((a, b) => a.depth - b.depth);
+  const drawInfos = showFullScene
+    ? sortedInfos
+    : sortedInfos.filter((info) =>
+        info.index === (activeCopyIndex === -1 ? 0 : activeCopyIndex),
+      );
 
-  const drawSliceProfile = (info, options = {}) => {
-    const { profile } = info;
-    if (!profile.length) {
-      return;
+  const pathSegments = [];
+  let totalPathLength = 0;
+  for (let i = 0; i < shapePoints.length; i += 1) {
+    const current = shapePoints[i];
+    const next = shapePoints[(i + 1) % shapePoints.length];
+    const length = Math.hypot(next.x - current.x, next.y - current.y);
+    if (!(length > 0)) {
+      continue;
     }
-    const {
-      fill,
-      stroke,
-      lineWidth = outlineWidth,
-      alpha = 1,
-    } = options;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.beginPath();
-    ctx.moveTo(profile[0].x, profile[0].y);
-    for (let i = 1; i < profile.length; i += 1) {
-      ctx.lineTo(profile[i].x, profile[i].y);
-    }
-    ctx.closePath();
-    if (fill) {
-      ctx.fillStyle = fill;
-      ctx.fill();
-    }
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
-    }
-    ctx.restore();
-  };
-
-  if (!showFullScene) {
-    const backSlices = sliceInfos
-      .filter((slice) => slice.depth < 0)
-      .sort((a, b) => a.depth - b.depth);
-    const frontSlices = sliceInfos
-      .filter((slice) => slice.depth >= 0)
-      .sort((a, b) => a.depth - b.depth);
-
-    const drawFilledSlice = (info) => {
-      const isActive = info.index === activeSlice;
-      const fill = isActive
-        ? 'rgba(231, 111, 81, 0.36)'
-        : info.facing
-        ? 'rgba(231, 111, 81, 0.22)'
-        : 'rgba(231, 111, 81, 0.08)';
-      const stroke = isActive
-        ? 'rgba(231, 111, 81, 0.95)'
-        : info.facing
-        ? 'rgba(231, 111, 81, 0.6)'
-        : 'rgba(231, 111, 81, 0.28)';
-      const width = isActive ? outlineWidth * 1.4 : outlineWidth;
-      drawSliceProfile(info, { fill, stroke, lineWidth: width });
-    };
-
-    backSlices.forEach((slice) => drawFilledSlice(slice));
-    frontSlices.forEach((slice) => drawFilledSlice(slice));
-
-    return;
+    totalPathLength += length;
+    pathSegments.push({ current, next, length, cumulative: totalPathLength });
   }
 
-  const backSlices = sliceInfos
-    .filter((slice) => slice.depth < 0)
-    .sort((a, b) => a.depth - b.depth);
-  const frontSlices = sliceInfos
-    .filter((slice) => slice.depth >= 0)
-    .sort((a, b) => a.depth - b.depth);
-
-  const drawSceneSlice = (info) => {
-    const shade = 0.5 + 0.5 * Math.cos(info.angle);
-    const isActive = info.index === activeSlice;
-    const fill = isActive
-      ? 'rgba(88, 208, 216, 0.32)'
-      : info.facing
-      ? `rgba(72, 156, 172, ${0.26 + shade * 0.28})`
-      : `rgba(22, 40, 52, ${0.18 + (1 - shade) * 0.18})`;
-    const stroke = info.facing
-      ? 'rgba(231, 244, 255, 0.26)'
-      : 'rgba(12, 24, 32, 0.3)';
-    const width = isActive
-      ? Math.max(outlineWidth * 1.4, canvas.width * 0.0018)
-      : Math.max(outlineWidth, canvas.width * 0.0012);
-    drawSliceProfile(info, { fill, stroke, lineWidth: width });
+  const getPathPoint = (t) => {
+    if (!pathSegments.length) {
+      return shapePoints[0];
+    }
+    const target = totalPathLength * (t % 1);
+    for (let i = 0; i < pathSegments.length; i += 1) {
+      const segment = pathSegments[i];
+      const prevLength = segment.cumulative - segment.length;
+      if (target <= segment.cumulative || i === pathSegments.length - 1) {
+        const localT = segment.length === 0 ? 0 : (target - prevLength) / segment.length;
+        return lerpPoint(segment.current, segment.next, localT);
+      }
+    }
+    return shapePoints[0];
   };
 
-  backSlices.forEach((slice) => drawSceneSlice(slice));
-  frontSlices.forEach((slice) => drawSceneSlice(slice));
+  const projectLocalPoint = (angle, point) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const radialDistance = baseRadius + point.x;
+    const worldPoint = {
+      x: radialDistance * cos,
+      y: baseLift + point.y,
+      z: radialDistance * sin,
+    };
+    return projectPointIso3d(worldPoint, origin, scale, verticalScale);
+  };
 
-  const drawRingOutline = (radiusOffset, options = {}) => {
-    const {
-      alpha = 0.3,
-      stroke = 'rgba(255, 255, 255, 0.2)',
-      lineWidth = Math.max(1, canvas.width * 0.0012),
-      facingOnly = false,
-    } = options;
-    const samples = 72;
-    const frontPoints = [];
-    const backPoints = [];
+  const drawGuideCircle = () => {
+    const samples = 84;
+    const front = [];
+    const back = [];
     for (let i = 0; i <= samples; i += 1) {
-      const angle = (i / samples) * Math.PI * 2;
+      const angle = baseAngle + (i / samples) * Math.PI * 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
-      const radial = majorRadius + radiusOffset;
-      const projected = projectPointIso3d(
-        {
-          x: radial * cos,
-          y: 0,
-          z: radial * sin,
-        },
-        baseCenter,
+      const point = projectPointIso3d(
+        { x: baseRadius * cos, y: 0, z: baseRadius * sin },
+        origin,
         scale,
         verticalScale,
       );
       if (cos >= 0) {
-        frontPoints.push(projected);
-      } else if (!facingOnly) {
-        backPoints.push(projected);
+        front.push(point);
+      } else {
+        back.push(point);
       }
     }
 
-    const drawPolyline = (points) => {
+    const drawPolyline = (points, style) => {
       if (!points.length) {
         return;
       }
       ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = lineWidth;
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = style.lineWidth;
+      ctx.globalAlpha = style.alpha;
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i += 1) {
@@ -1549,65 +1481,116 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       ctx.restore();
     };
 
-    if (!facingOnly) {
-      drawPolyline(backPoints);
+    const backStyle = {
+      stroke: 'rgba(18, 34, 44, 0.7)',
+      lineWidth: Math.max(1.2, canvas.width * 0.0014),
+      alpha: 0.9,
+    };
+    const frontStyle = {
+      stroke: 'rgba(88, 160, 180, 0.6)',
+      lineWidth: Math.max(1.4, canvas.width * 0.0018),
+      alpha: 0.95,
+    };
+
+    drawPolyline(back, backStyle);
+    drawPolyline(front, frontStyle);
+
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < front.length; i += 1) {
+      if (i === 0) {
+        ctx.moveTo(front[i].x, front[i].y);
+      } else {
+        ctx.lineTo(front[i].x, front[i].y);
+      }
     }
-    drawPolyline(frontPoints);
+    for (let i = back.length - 1; i >= 0; i -= 1) {
+      ctx.lineTo(back[i].x, back[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(10, 28, 34, 0.32)';
+    ctx.fill();
+    ctx.restore();
   };
 
-  drawRingOutline(outerRadius, {
-    alpha: 0.32,
-    stroke: 'rgba(255, 255, 255, 0.24)',
-    lineWidth: Math.max(1.4, canvas.width * 0.0018),
+  drawGuideCircle();
+
+  const drawRadialLine = (info) => {
+    const base = projectLocalPoint(info.angle, {
+      x: 0,
+      y: crossSectionData.minY,
+    });
+    ctx.save();
+    ctx.strokeStyle = info.facing
+      ? 'rgba(120, 200, 210, 0.55)'
+      : 'rgba(30, 54, 64, 0.4)';
+    ctx.lineWidth = Math.max(1, canvas.width * 0.0014);
+    ctx.beginPath();
+    ctx.moveTo(originPoint.x, originPoint.y);
+    ctx.lineTo(base.x, base.y);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const drawShape = (info) => {
+    const isoPoints = shapePoints.map((pt) => projectLocalPoint(info.angle, pt));
+    if (!isoPoints.length) {
+      return;
+    }
+    const isActive = info.index === activeCopyIndex;
+    const frontShade = info.facing ? 0.26 : 0.14;
+    const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
+    const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(isoPoints[0].x, isoPoints[0].y);
+    for (let i = 1; i < isoPoints.length; i += 1) {
+      ctx.lineTo(isoPoints[i].x, isoPoints[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = `rgba(231, 111, 81, ${Math.min(0.85, baseAlpha + (isActive ? 0.18 : 0))})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(93, 42, 44, ${strokeAlpha})`;
+    ctx.lineWidth = Math.max(1.6, canvas.width * (isActive ? 0.0024 : 0.0016));
+    ctx.stroke();
+    ctx.restore();
+
+    if (isActive && totalPathLength > 0) {
+      const localPoint = getPathPoint(copyProgress);
+      const isoPoint = projectLocalPoint(info.angle, localPoint);
+      const radius = Math.max(4, canvas.width * 0.0042);
+      ctx.save();
+      ctx.fillStyle = segmentColor;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = Math.max(1, radius * 0.35);
+      ctx.beginPath();
+      ctx.arc(isoPoint.x, isoPoint.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  drawInfos.forEach((info) => {
+    drawRadialLine(info);
+    drawShape(info);
   });
 
-  drawRingOutline(innerRadius, {
-    alpha: 0.24,
-    stroke: 'rgba(10, 16, 24, 0.5)',
-    lineWidth: Math.max(1.2, canvas.width * 0.0016),
-    facingOnly: false,
-  });
-
-  const outerRadial = majorRadius + outerRadius;
-  const baseAngle = -Math.PI / 2;
-  const markerAngle = baseAngle + progress * Math.PI * 2;
-  const markerPoint = projectPointIso3d(
-    {
-      x: outerRadial * Math.cos(markerAngle),
-      y: 0,
-      z: outerRadial * Math.sin(markerAngle),
-    },
-    baseCenter,
-    scale,
-    verticalScale,
-  );
-
-  const soundPoint = projectPointIso3d(
-    {
-      x: outerRadial * Math.cos(baseAngle),
-      y: 0,
-      z: outerRadial * Math.sin(baseAngle),
-    },
-    baseCenter,
-    scale,
-    verticalScale,
-  );
-
-  const markerRadius = Math.max(4, canvas.width * 0.0046);
+  const baseMarkerRadius = Math.max(4, canvas.width * 0.0046);
 
   const drawMarker = (point, options = {}) => {
     const {
       color = segmentColor,
       stroke = strokeColor,
-      baseOpacity = 0.32,
-      radius = markerRadius,
+      baseOpacity = 0.25,
+      radius = baseMarkerRadius,
     } = options;
     ctx.save();
     if (baseOpacity > 0) {
       ctx.globalAlpha = baseOpacity;
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(point.x, point.y, radius * 1.8, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, radius * 1.7, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
     }
@@ -1621,11 +1604,34 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     ctx.restore();
   };
 
+  const markerAngle = baseAngle + overallProgress * Math.PI * 2;
+  const markerPoint = projectPointIso3d(
+    {
+      x: (baseRadius + shapeRadius * 0.15) * Math.cos(markerAngle),
+      y: 0,
+      z: (baseRadius + shapeRadius * 0.15) * Math.sin(markerAngle),
+    },
+    origin,
+    scale,
+    verticalScale,
+  );
+
+  const soundPoint = projectPointIso3d(
+    {
+      x: (baseRadius + shapeRadius * 0.15) * Math.cos(baseAngle),
+      y: 0,
+      z: (baseRadius + shapeRadius * 0.15) * Math.sin(baseAngle),
+    },
+    origin,
+    scale,
+    verticalScale,
+  );
+
   drawMarker(soundPoint, {
     color: 'rgba(255, 255, 255, 0.85)',
     stroke: 'rgba(255, 255, 255, 0.9)',
-    baseOpacity: 0.16,
-    radius: markerRadius * 0.75,
+    baseOpacity: 0.18,
+    radius: baseMarkerRadius * 0.75,
   });
 
   drawMarker(markerPoint);
