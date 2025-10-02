@@ -25,7 +25,7 @@ const quadrantModes = {
   laya: '1d',
   gati: '2d',
   jati: '3d',
-  nadai: '2d',
+  nadai: '3d',
 };
 
 function setQuadrantMode(quadrant, mode) {
@@ -333,7 +333,16 @@ function drawCircle(point, color) {
   ctx.fill();
 }
 
-function drawEventMarker(point, strokeColor, fillColor, radius) {
+function drawEventMarker(point, strokeColor, fillColor, radius, options = {}) {
+  const { highlight = false } = options;
+  if (highlight) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.save();
   ctx.fillStyle = fillColor;
   ctx.strokeStyle = strokeColor;
@@ -420,8 +429,10 @@ function drawQuadrantShape(name, config, elapsed) {
     drawLine(start, end);
 
     const eventPoints = getLineSoundPoints(start, end, config, config.soundMarkers);
-    eventPoints.forEach((pt) => {
-      drawEventMarker(pt, strokeColor, color, eventRadius);
+    eventPoints.forEach((pt, index) => {
+      drawEventMarker(pt, strokeColor, color, eventRadius, {
+        highlight: !!config.highlightFirstEvent && index === 0,
+      });
     });
 
     let point;
@@ -456,8 +467,10 @@ function drawQuadrantShape(name, config, elapsed) {
     const { points } = getPolygonPoints(config.orientation, config.sides);
     drawPolygon(points);
     const eventPoints = getPolygonSoundPoints(points, config.soundMarkers);
-    eventPoints.forEach((pt) => {
-      drawEventMarker(pt, strokeColor, color, eventRadius);
+    eventPoints.forEach((pt, index) => {
+      drawEventMarker(pt, strokeColor, color, eventRadius, {
+        highlight: !!config.highlightFirstEvent && index === 0,
+      });
     });
     const segmentDuration = config.segmentDuration;
     const cycleDuration = segmentDuration * config.segmentCount;
@@ -474,7 +487,9 @@ function drawQuadrantShape(name, config, elapsed) {
     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    drawEventMarker(top, strokeColor, color, eventRadius);
+    drawEventMarker(top, strokeColor, color, eventRadius, {
+      highlight: !!config.highlightFirstEvent,
+    });
 
     const segmentDuration = config.segmentDuration || 0;
     let progress = 0;
@@ -2376,6 +2391,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiCountInput)
       view2d: {
         ...gatiShape,
         soundMarkers: { mode: 'count', count: gatiCount },
+        highlightFirstEvent: true,
       },
     },
     jati: {
@@ -2395,6 +2411,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiCountInput)
       view2d: {
         ...nadaiShape,
         soundMarkers: { mode: 'count', count: safeNadaiCount },
+        highlightFirstEvent: true,
       },
       gatiCount: safeGatiCount,
     },
