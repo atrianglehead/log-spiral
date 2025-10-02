@@ -67,6 +67,13 @@ const muteState = {
   nadai: false,
 };
 
+function clamp(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(Math.max(value, min), max);
+}
+
 function formatMuteTargetLabel(target = '') {
   if (!target) {
     return '';
@@ -270,85 +277,217 @@ function updateQuadrantTabSizing(rect) {
   if (!rect) {
     return;
   }
-  const { width, height } = rect;
+
+  const { width, height, left: canvasLeft, top: canvasTop } = rect;
+  const canvasRight = rect.right;
+  const canvasBottom = rect.bottom;
   const quadrantWidth = width / 2;
   const quadrantHeight = height / 2;
-  const maxWidth = quadrantWidth / 3;
-  const maxHeight = quadrantHeight / 6;
 
-  const measurements = quadrantTabs.map((tab) => {
-    tab.style.setProperty('--quadrant-tab-max-width', `${maxWidth}px`);
-    tab.style.setProperty('--quadrant-tab-max-height', `${maxHeight}px`);
+  const desiredMarginX = clamp(quadrantWidth * 0.08, 12, 40);
+  const desiredMarginY = clamp(quadrantHeight * 0.08, 12, 40);
+  const availableMarginX = Math.max(0, quadrantWidth / 2 - 6);
+  const availableMarginY = Math.max(0, quadrantHeight / 2 - 6);
+  const minimumMarginX = availableMarginX > 0 ? clamp(quadrantWidth * 0.02, 6, 14) : 0;
+  const minimumMarginY = availableMarginY > 0 ? clamp(quadrantHeight * 0.02, 6, 14) : 0;
+  const safeMarginX = availableMarginX > 0 ? clamp(desiredMarginX, minimumMarginX, availableMarginX) : 0;
+  const safeMarginY = availableMarginY > 0 ? clamp(desiredMarginY, minimumMarginY, availableMarginY) : 0;
+
+  const canvasCenterX = canvasLeft + quadrantWidth;
+  const canvasCenterY = canvasTop + quadrantHeight;
+
+  const quadrantBounds = {
+    gati: {
+      left: canvasLeft + safeMarginX,
+      right: canvasCenterX - safeMarginX,
+      top: canvasTop + safeMarginY,
+      bottom: canvasCenterY - safeMarginY,
+    },
+    jati: {
+      left: canvasCenterX + safeMarginX,
+      right: canvasRight - safeMarginX,
+      top: canvasTop + safeMarginY,
+      bottom: canvasCenterY - safeMarginY,
+    },
+    laya: {
+      left: canvasLeft + safeMarginX,
+      right: canvasCenterX - safeMarginX,
+      top: canvasCenterY + safeMarginY,
+      bottom: canvasBottom - safeMarginY,
+    },
+    nadai: {
+      left: canvasCenterX + safeMarginX,
+      right: canvasRight - safeMarginX,
+      top: canvasCenterY + safeMarginY,
+      bottom: canvasBottom - safeMarginY,
+    },
+  };
+
+  const fallbackBounds = {
+    left: canvasLeft + safeMarginX,
+    right: canvasRight - safeMarginX,
+    top: canvasTop + safeMarginY,
+    bottom: canvasBottom - safeMarginY,
+  };
+
+  const resetMeasurements = quadrantTabs.map((tab) => {
     tab.style.setProperty('--quadrant-tab-scale', '1');
     tab.style.setProperty('--quadrant-tab-translate-x', '0px');
     tab.style.setProperty('--quadrant-tab-translate-y', '0px');
-    const { width: naturalWidth, height: naturalHeight } = tab.getBoundingClientRect();
+    tab.style.left = '';
+    tab.style.right = '';
+    tab.style.top = '';
+    tab.style.bottom = '';
 
+    const { width: naturalWidth, height: naturalHeight } = tab.getBoundingClientRect();
     return { tab, naturalWidth, naturalHeight };
   });
 
-  const gatiMeasurement = measurements.find(({ tab }) => tab.dataset.quadrant === 'gati');
-  let gatiTargetHeight = null;
+  const computeMetricsForTab = (entry, bounds, targetHeight = null, maxWidthOverride = null) => {
+    const availableWidth = Math.max(0, bounds.right - bounds.left);
+    const constrainedWidth =
+      maxWidthOverride !== null && maxWidthOverride !== undefined
+        ? Math.max(0, Math.min(availableWidth, maxWidthOverride))
+        : availableWidth;
+    const availableHeight = Math.max(0, bounds.bottom - bounds.top);
 
-  if (
-    gatiMeasurement &&
-    gatiMeasurement.naturalWidth > 0 &&
-    gatiMeasurement.naturalHeight > 0
-  ) {
-    const gatiWidthScale = maxWidth > 0 ? maxWidth / gatiMeasurement.naturalWidth : 1;
-    const gatiHeightScale = maxHeight > 0 ? maxHeight / gatiMeasurement.naturalHeight : 1;
-    const gatiScale = Math.min(1, gatiWidthScale, gatiHeightScale);
-    gatiTargetHeight = gatiMeasurement.naturalHeight * gatiScale;
-  }
-
-  measurements.forEach(({ tab, naturalWidth, naturalHeight }) => {
-    if (!naturalWidth || !naturalHeight) {
-      tab.style.setProperty('--quadrant-tab-scale', '1');
-      return;
+    if (!entry || !entry.naturalWidth || !entry.naturalHeight) {
+      return {
+        scale: 1,
+        width: entry?.naturalWidth ?? constrainedWidth,
+        height: entry?.naturalHeight ?? availableHeight,
+        maxWidth: constrainedWidth,
+        maxHeight: availableHeight,
+      };
     }
+    const widthScale =
+      entry.naturalWidth > 0
+        ? constrainedWidth > 0
+          ? constrainedWidth / entry.naturalWidth
+          : 0
+        : 1;
+    const heightScale =
+      entry.naturalHeight > 0
+        ? availableHeight > 0
+          ? availableHeight / entry.naturalHeight
+          : 0
+        : 1;
 
-    const widthScale = maxWidth > 0 ? maxWidth / naturalWidth : 1;
-    const heightScale = maxHeight > 0 ? maxHeight / naturalHeight : 1;
-    let scale = Math.min(1, widthScale, heightScale);
+    const maxScale = 1.5;
+    let scale = Math.min(widthScale, heightScale, maxScale);
 
-    if (gatiTargetHeight && naturalHeight > 0) {
-      const matchGatiScale = gatiTargetHeight / naturalHeight;
-      if (Number.isFinite(matchGatiScale) && matchGatiScale > 0) {
-        scale = Math.min(scale, matchGatiScale, 1);
+    if (targetHeight && entry.naturalHeight > 0) {
+      const matchScale = targetHeight / entry.naturalHeight;
+      if (Number.isFinite(matchScale) && matchScale > 0) {
+        scale = Math.min(scale, matchScale, maxScale);
       }
     }
 
-    tab.style.setProperty('--quadrant-tab-scale', `${scale}`);
+    if (!Number.isFinite(scale) || scale <= 0) {
+      const fallbackScale = Math.max(widthScale, heightScale, 0);
+      scale = Number.isFinite(fallbackScale) ? Math.min(fallbackScale, maxScale) : 0;
+    }
+
+    if (!Number.isFinite(scale) || scale < 0) {
+      scale = 0;
+    }
+
+    return {
+      scale,
+      width: entry.naturalWidth * scale,
+      height: entry.naturalHeight * scale,
+      maxWidth: constrainedWidth,
+      maxHeight: availableHeight,
+    };
+  };
+
+  const metricsByTab = new Map();
+  const gatiEntry = resetMeasurements.find(({ tab }) => tab.dataset.quadrant === 'gati');
+  let gatiTargetHeight = null;
+
+  if (gatiEntry) {
+    const gatiBounds = quadrantBounds.gati || fallbackBounds;
+    const gatiMaxWidth = Math.min(
+      Math.max(0, gatiBounds.right - gatiBounds.left),
+      Math.max(0, quadrantWidth * 0.4),
+    );
+    const gatiMetrics = computeMetricsForTab(gatiEntry, gatiBounds, null, gatiMaxWidth);
+    metricsByTab.set(gatiEntry.tab, gatiMetrics);
+    gatiTargetHeight = gatiMetrics.height;
+  }
+
+  resetMeasurements.forEach((entry) => {
+    if (metricsByTab.has(entry.tab)) {
+      return;
+    }
+    const bounds = quadrantBounds[entry.tab.dataset.quadrant] || fallbackBounds;
+    const maxWidth = Math.min(
+      Math.max(0, bounds.right - bounds.left),
+      Math.max(0, quadrantWidth * 0.4),
+    );
+    const metrics = computeMetricsForTab(entry, bounds, gatiTargetHeight, maxWidth);
+    metricsByTab.set(entry.tab, metrics);
   });
 
-  const canvasRect = rect;
+  const alignmentByQuadrant = {
+    gati: { horizontal: 'left', vertical: 'top' },
+    jati: { horizontal: 'right', vertical: 'top' },
+    laya: { horizontal: 'left', vertical: 'top' },
+    nadai: { horizontal: 'right', vertical: 'top' },
+  };
 
   quadrantTabs.forEach((tab) => {
-    const computed = getComputedStyle(tab);
-    const scale = Number.parseFloat(computed.getPropertyValue('--quadrant-tab-scale')) || 1;
-    const tabRect = tab.getBoundingClientRect();
-    let shiftX = 0;
-    let shiftY = 0;
+    const quadrant = tab.dataset.quadrant;
+    const bounds = quadrantBounds[quadrant] || fallbackBounds;
+    const metrics =
+      metricsByTab.get(tab) ||
+      {
+        scale: 1,
+        width: 0,
+        height: 0,
+        maxWidth: Math.max(0, bounds.right - bounds.left),
+        maxHeight: Math.max(0, bounds.bottom - bounds.top),
+      };
+    const alignment = alignmentByQuadrant[quadrant] || alignmentByQuadrant.gati;
 
-    if (tabRect.left < canvasRect.left) {
-      shiftX = canvasRect.left - tabRect.left;
-    } else if (tabRect.right > canvasRect.right) {
-      shiftX = canvasRect.right - tabRect.right;
+    const availableWidth = Number.isFinite(metrics.maxWidth)
+      ? metrics.maxWidth
+      : Math.max(0, bounds.right - bounds.left);
+    const availableHeight = Number.isFinite(metrics.maxHeight)
+      ? metrics.maxHeight
+      : Math.max(0, bounds.bottom - bounds.top);
+
+    const width = Math.min(metrics.width, availableWidth);
+    const height = Math.min(metrics.height, availableHeight);
+
+    let targetLeft = alignment.horizontal === 'right' ? bounds.right - width : bounds.left;
+    let targetTop = alignment.vertical === 'bottom' ? bounds.bottom - height : bounds.top;
+
+    targetLeft = clamp(targetLeft, bounds.left, bounds.right - width);
+    targetTop = clamp(targetTop, bounds.top, bounds.bottom - height);
+
+    const relativeLeft = targetLeft - canvasLeft;
+    const relativeTop = targetTop - canvasTop;
+    const relativeRight = canvasRight - (targetLeft + width);
+
+    const maxWidthValue = availableWidth > 0 ? `${availableWidth}px` : 'none';
+    const maxHeightValue = availableHeight > 0 ? `${availableHeight}px` : 'none';
+    tab.style.setProperty('--quadrant-tab-max-width', maxWidthValue);
+    tab.style.setProperty('--quadrant-tab-max-height', maxHeightValue);
+    tab.style.setProperty('--quadrant-tab-scale', `${metrics.scale}`);
+    tab.style.setProperty('--quadrant-tab-translate-x', '0px');
+    tab.style.setProperty('--quadrant-tab-translate-y', '0px');
+    tab.style.top = `${relativeTop}px`;
+    tab.style.bottom = 'auto';
+    if (alignment.horizontal === 'right') {
+      tab.style.right = `${relativeRight}px`;
+      tab.style.left = 'auto';
+      tab.style.transformOrigin = 'top right';
+    } else {
+      tab.style.left = `${relativeLeft}px`;
+      tab.style.right = 'auto';
+      tab.style.transformOrigin = 'top left';
     }
-
-    if (tabRect.top < canvasRect.top) {
-      shiftY = canvasRect.top - tabRect.top;
-    } else if (tabRect.bottom > canvasRect.bottom) {
-      shiftY = canvasRect.bottom - tabRect.bottom;
-    }
-
-    if (scale !== 0) {
-      shiftX /= scale;
-      shiftY /= scale;
-    }
-
-    tab.style.setProperty('--quadrant-tab-translate-x', `${shiftX}px`);
-    tab.style.setProperty('--quadrant-tab-translate-y', `${shiftY}px`);
   });
 }
 
