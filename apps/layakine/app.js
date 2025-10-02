@@ -59,30 +59,6 @@ let isPlaying = false;
 let startTime = 0;
 let pausedElapsed = 0;
 
-const nadaiValues = (() => {
-  const values = [];
-  for (let d = 13; d >= 2; d -= 1) {
-    values.push(1 / d);
-  }
-  values.push(1);
-  for (let n = 2; n <= 13; n += 1) {
-    values.push(n);
-  }
-  return values;
-})();
-
-const nadaiLabels = (() => {
-  const labels = [];
-  for (let d = 13; d >= 2; d -= 1) {
-    labels.push(`1/${d}`);
-  }
-  labels.push('1');
-  for (let n = 2; n <= 13; n += 1) {
-    labels.push(String(n));
-  }
-  return labels;
-})();
-
 const muteState = {
   laya: false,
   gati: false,
@@ -151,9 +127,7 @@ function updateValueLabels() {
   valueLabels.laya.textContent = formatLayaValue(sliders.laya.value);
   valueLabels.gati.textContent = sliders.gati.value;
   valueLabels.jati.textContent = sliders.jati.value;
-  const nadaiIndex = Number(sliders.nadai.value);
-  const display = nadaiLabels[nadaiIndex];
-  valueLabels.nadai.textContent = display;
+  valueLabels.nadai.textContent = sliders.nadai.value;
 }
 
 function playClick(kind, time) {
@@ -213,7 +187,7 @@ function resetSchedulers() {
   const layaPeriod = 60 / Number(sliders.laya.value);
   const gatiCount = Number(sliders.gati.value);
   const jatiCount = Number(sliders.jati.value);
-  const nadaiValue = nadaiValues[Number(sliders.nadai.value)];
+  const nadaiCount = Number(sliders.nadai.value);
 
   recalcVoice('laya', layaPeriod, { cycleSegments: 1, playEverySegment: true });
 
@@ -231,11 +205,13 @@ function resetSchedulers() {
     playEverySegment: jatiSegments <= 1,
   });
 
-  const nadaiSegmentDuration = gatiSideDuration * (1 / nadaiValue);
-  const nadaiSubdivisions = jatiSegments;
+  const jatiCycleDuration = gatiSideDuration * jatiSegments;
+  const nadaiSegments = Math.max(1, nadaiCount);
+  const nadaiSegmentDuration =
+    nadaiSegments > 0 && jatiCycleDuration > 0 ? jatiCycleDuration / nadaiSegments : 0;
   recalcVoice('nadai', nadaiSegmentDuration, {
-    cycleSegments: nadaiSubdivisions,
-    playEverySegment: nadaiSubdivisions <= 1,
+    cycleSegments: nadaiSegments,
+    playEverySegment: true,
   });
 }
 
@@ -2134,8 +2110,10 @@ function drawQuadrantLabel(name, quadrant) {
   ctx.restore();
 }
 
-function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
+function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiCountInput) {
   const safeLayaPeriod = Number.isFinite(layaPeriod) ? layaPeriod : 0;
+  const safeGatiCount = Math.max(1, gatiCount);
+  const safeNadaiCount = Math.max(1, Math.floor(nadaiCountInput || 0));
 
   const layaView =
     safeLayaPeriod > 0
@@ -2161,41 +2139,42 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
     };
   })();
 
+  const baseJatiDuration = safeLayaPeriod / safeGatiCount;
   const jatiShape = (() => {
-    const baseDuration = safeLayaPeriod / Math.max(1, gatiCount);
     if (jatiCount === 1) {
-      return { shape: 'circle', segmentCount: 1, segmentDuration: baseDuration };
+      return { shape: 'circle', segmentCount: 1, segmentDuration: baseJatiDuration };
     }
     if (jatiCount === 2) {
-      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseDuration };
+      return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseJatiDuration };
     }
     return {
       shape: 'polygon',
       sides: jatiCount,
       segmentCount: jatiCount,
-      segmentDuration: baseDuration,
+      segmentDuration: baseJatiDuration,
     };
   })();
 
+  const jatiCycle = (jatiShape.segmentDuration || 0) * (jatiShape.segmentCount || 1);
   const nadaiShape = (() => {
-    const baseDuration = (safeLayaPeriod / Math.max(1, gatiCount)) * (1 / nadaiValue);
-    if (jatiCount === 1) {
-      return { shape: 'circle', segmentCount: 1, segmentDuration: baseDuration };
+    const baseDuration =
+      safeNadaiCount > 0 && jatiCycle > 0 ? jatiCycle / safeNadaiCount : jatiCycle;
+    if (safeNadaiCount === 1) {
+      return { shape: 'circle', segmentCount: 1, segmentDuration: jatiCycle };
     }
-    if (jatiCount === 2) {
+    if (safeNadaiCount === 2) {
       return { shape: 'line', bounce: true, segmentCount: 2, segmentDuration: baseDuration };
     }
     return {
       shape: 'polygon',
-      sides: jatiCount,
-      segmentCount: jatiCount,
+      sides: safeNadaiCount,
+      segmentCount: safeNadaiCount,
       segmentDuration: baseDuration,
     };
   })();
 
   const gatiCycle = (gatiShape.segmentDuration || 0) * (gatiShape.segmentCount || 1);
-  const jatiCycle = (jatiShape.segmentDuration || 0) * (jatiShape.segmentCount || 1);
-  const nadaiCycle = (nadaiShape.segmentDuration || 0) * (nadaiShape.segmentCount || 1);
+  const nadaiCycle = jatiCycle;
 
   const gatiView1d = (() => {
     if (!safeLayaPeriod) {
@@ -2276,7 +2255,7 @@ function buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue) {
       view1d: nadaiView1d,
       view2d: {
         ...nadaiShape,
-        soundMarkers: { mode: 'first' },
+        soundMarkers: { mode: 'count', count: safeNadaiCount },
       },
     },
   };
@@ -2358,9 +2337,9 @@ function render() {
   const layaPeriod = 60 / Number(sliders.laya.value);
   const gatiCount = Number(sliders.gati.value);
   const jatiCount = Number(sliders.jati.value);
-  const nadaiValue = nadaiValues[Number(sliders.nadai.value)];
+  const nadaiCount = Number(sliders.nadai.value);
 
-  const quadrantConfigs = buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiValue);
+  const quadrantConfigs = buildQuadrantConfigs(layaPeriod, gatiCount, jatiCount, nadaiCount);
 
   drawQuadrant('laya', quadrantConfigs.laya, elapsed);
   drawQuadrant('gati', quadrantConfigs.gati, elapsed);
@@ -2417,10 +2396,7 @@ playToggle.addEventListener('click', () => {
 
 Object.entries(sliders).forEach(([name, input]) => {
   input.addEventListener('input', () => {
-    if (name === 'nadai') {
-      const display = nadaiLabels[Number(input.value)];
-      valueLabels.nadai.textContent = display;
-    } else if (name === 'laya') {
+    if (name === 'laya') {
       valueLabels.laya.textContent = formatLayaValue(input.value);
     } else {
       valueLabels[name].textContent = input.value;
