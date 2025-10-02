@@ -536,19 +536,47 @@ function getOffsetsFromQuadrant(quadrant) {
   return { offsetX, offsetY, width: halfW, height: halfH };
 }
 
+const QUADRANT_VERTICAL_SHIFT_RATIO = 0.12;
+const QUADRANT_CENTER_MIN_RATIO = 0.35;
+const QUADRANT_CENTER_MAX_RATIO = 0.88;
+
+function getQuadrantMetrics(quadrant) {
+  const offsets = getOffsetsFromQuadrant(quadrant);
+  const { offsetX, offsetY, width, height } = offsets;
+  const baseCenterX = offsetX + width / 2;
+  const baseCenterY = offsetY + height / 2;
+  if (!(width > 0) || !(height > 0)) {
+    return {
+      ...offsets,
+      center: { x: baseCenterX, y: baseCenterY },
+      verticalShift: 0,
+    };
+  }
+  const desiredCenterY = baseCenterY + height * QUADRANT_VERTICAL_SHIFT_RATIO;
+  const minCenterY = offsetY + height * QUADRANT_CENTER_MIN_RATIO;
+  const maxCenterY = offsetY + height * QUADRANT_CENTER_MAX_RATIO;
+  const centerY = clamp(desiredCenterY, minCenterY, maxCenterY);
+  return {
+    ...offsets,
+    center: { x: baseCenterX, y: centerY },
+    verticalShift: centerY - baseCenterY,
+  };
+}
+
 function getLinePoints(quadrant, margin = 0.18) {
-  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
+  const { offsetX, width, center } = getQuadrantMetrics(quadrant);
   const paddingX = width * margin;
-  const y = offsetY + height / 2;
   const x1 = offsetX + paddingX;
   const x2 = offsetX + width - paddingX;
-  return [{ x: x1, y }, { x: x2, y }];
+  return [
+    { x: x1, y: center.y },
+    { x: x2, y: center.y },
+  ];
 }
 
 function getPolygonPoints(quadrant, sides, options = {}) {
-  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
+  const { offsetX, offsetY, width, height, center } = getQuadrantMetrics(quadrant);
   const radius = Math.min(width, height) * 0.32;
-  const center = { x: offsetX + width / 2, y: offsetY + height / 2 };
   const points = [];
   const { rotationOffset = 0, alignToDiagonal = false } = options;
   let rotation = -Math.PI / 2;
@@ -571,9 +599,8 @@ function getPolygonPoints(quadrant, sides, options = {}) {
 }
 
 function getCircleGeometry(quadrant) {
-  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
+  const { width, height, center } = getQuadrantMetrics(quadrant);
   const radius = Math.min(width, height) * 0.32;
-  const center = { x: offsetX + width / 2, y: offsetY + height / 2 };
   const top = { x: center.x, y: center.y - radius };
   return { center, radius, top };
 }
@@ -900,9 +927,13 @@ function drawGatiQuadrant3d(config, elapsed) {
     return;
   }
 
-  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
-  const baseCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
-  const isoOrigin = { x: offsetX + width * 0.54, y: offsetY + height * 0.72 };
+  const { offsetX, offsetY, width, height, center } =
+    getQuadrantMetrics(orientation);
+  const baseCenter = center;
+  const isoOrigin = {
+    x: offsetX + width * 0.54,
+    y: clamp(baseCenter.y + height * 0.22, offsetY, offsetY + height),
+  };
   const scale = 0.82;
   const strokeColor = getStrokeColor('gati');
   const segmentColor = getSegmentColor('gati');
@@ -1209,9 +1240,12 @@ function drawJatiQuadrant3d(config, elapsed) {
     return;
   }
 
-  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
-  const baseCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
-  const isoOrigin = { x: offsetX + width * 0.46, y: offsetY + height * 0.72 };
+  const { offsetX, offsetY, width, height, center } = getQuadrantMetrics(orientation);
+  const baseCenter = center;
+  const isoOrigin = {
+    x: offsetX + width * 0.46,
+    y: clamp(baseCenter.y + height * 0.22, offsetY, offsetY + height),
+  };
   const scale = 0.82;
   const strokeColor = getStrokeColor('jati');
   const segmentColor = getSegmentColor('jati');
@@ -1624,8 +1658,12 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     return;
   }
 
-  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
-  const origin = { x: offsetX + width * 0.54, y: offsetY + height * 0.68 };
+  const { offsetX, offsetY, width, height, center, verticalShift } =
+    getQuadrantMetrics(orientation);
+  const origin = {
+    x: offsetX + width * 0.54,
+    y: clamp(offsetY + height * 0.68 + verticalShift, offsetY, offsetY + height),
+  };
   const baseRadius = Math.min(width, height) * 0.22;
   const shapeRadius = baseRadius * 0.55;
   const crossSectionData = buildJatiCrossSection(view2d, shapeRadius);
@@ -1910,7 +1948,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       x: (bounds.minX + bounds.maxX) / 2,
       y: (bounds.minY + bounds.maxY) / 2,
     };
-    const targetCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
+    const targetCenter = center;
     const shift = {
       x: targetCenter.x - currentCenter.x,
       y: targetCenter.y - currentCenter.y,
@@ -2091,8 +2129,12 @@ function drawNadaiQuadrant3d(config, elapsed) {
     return;
   }
 
-  const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
-  const origin = { x: offsetX + width * 0.54, y: offsetY + height * 0.68 };
+  const { offsetX, offsetY, width, height, center, verticalShift } =
+    getQuadrantMetrics(orientation);
+  const origin = {
+    x: offsetX + width * 0.54,
+    y: clamp(offsetY + height * 0.68 + verticalShift, offsetY, offsetY + height),
+  };
   const baseRadius = Math.min(width, height) * 0.22;
   const shapeRadius = baseRadius * 0.55;
   const crossSectionData = buildJatiCrossSection(view2d, shapeRadius);
@@ -2377,7 +2419,7 @@ function drawNadaiQuadrant3d(config, elapsed) {
       x: (bounds.minX + bounds.maxX) / 2,
       y: (bounds.minY + bounds.maxY) / 2,
     };
-    const targetCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
+    const targetCenter = center;
     const shift = {
       x: targetCenter.x - currentCenter.x,
       y: targetCenter.y - currentCenter.y,
