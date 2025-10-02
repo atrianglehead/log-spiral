@@ -1706,7 +1706,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
     const highlightFirstCopy = info.index === 0;
-    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.92)';
+    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.46)';
     const highlightLineWidth = Math.max(0.7, canvas.width * 0.001);
     if (isLineShape && info.lineSegment) {
       ctx.save();
@@ -2173,7 +2173,7 @@ function drawNadaiQuadrant3d(config, elapsed) {
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
     const highlightFirstCopy = info.index === 0;
-    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.92)';
+    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.46)';
     const highlightLineWidth = Math.max(0.7, canvas.width * 0.001);
     if (isLineShape && info.lineSegment) {
       ctx.save();
