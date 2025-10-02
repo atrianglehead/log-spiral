@@ -1590,6 +1590,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     includePointInBounds(info.radialIso);
     info.pathIsoPoints.forEach(includePointInBounds);
     info.points.forEach((pt) => includePointInBounds(pt.iso));
+    info.soundIsoPoints.forEach(includePointInBounds);
     if (info.lineSegment) {
       includePointInBounds(info.lineSegment.start);
       includePointInBounds(info.lineSegment.end);
@@ -1630,6 +1631,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
           ...pt,
           iso: translatePoint(pt.iso),
         }));
+        info.soundIsoPoints = info.soundIsoPoints.map(translatePoint);
         if (info.lineSegment) {
           info.lineSegment = {
             ...info.lineSegment,
@@ -1844,6 +1846,35 @@ function drawNadaiQuadrant3d(config, elapsed) {
   };
   const referenceInnerIndex = primaryInnerCandidate?.index ?? innerPointIndex;
 
+  const soundMarkerIndices = (() => {
+    const markers = view2d.soundMarkers;
+    if (!markers) {
+      return [];
+    }
+    if (view2d.shape === 'polygon') {
+      if (markers.mode === 'count') {
+        const count = Math.max(
+          1,
+          Math.min(shapePoints.length, Math.floor(markers.count || 0)),
+        );
+        return Array.from({ length: count }, (_, index) => index);
+      }
+      if (markers.mode === 'first') {
+        return [0];
+      }
+      return shapePoints.map((_, index) => index);
+    }
+    return [];
+  })();
+
+  const nonCommonSoundIndices = soundMarkerIndices.filter((index) => {
+    const point = shapePoints[index];
+    if (!point) {
+      return false;
+    }
+    return Math.abs(point.x - innerPointLocalX) > epsilon;
+  });
+
   const soundCircleRadius = baseRadius + innerPointLocalX;
   const soundWorldPoint = {
     x: soundCircleRadius * Math.cos(baseAngle),
@@ -1938,6 +1969,10 @@ function drawNadaiQuadrant3d(config, elapsed) {
       pathIsoPoints.push(point.iso);
     }
 
+    const soundIsoPoints = nonCommonSoundIndices
+      .map((index) => translatedPoints[index]?.iso)
+      .filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y));
+
     const pathSegmentLengths = [];
     let pathTotalLength = 0;
     for (let i = 0; i < pathIsoPoints.length - 1; i += 1) {
@@ -1996,6 +2031,7 @@ function drawNadaiQuadrant3d(config, elapsed) {
         pathTotalLength: lineSegment.length,
         radialIso: lineSegment.end || translatedIsoBase,
         lineSegment,
+        soundIsoPoints,
       };
     }
 
@@ -2013,6 +2049,7 @@ function drawNadaiQuadrant3d(config, elapsed) {
       pathTotalLength,
       radialIso: radialTarget?.iso || translatedIsoBase,
       lineSegment: null,
+      soundIsoPoints,
     };
   });
 
@@ -2195,6 +2232,37 @@ function drawNadaiQuadrant3d(config, elapsed) {
       return;
     }
     drawShape(info, { activeCopyIndex });
+  });
+
+  const drawSoundMarker = (point, options = {}) => {
+    const { highlight = false } = options;
+    if (!point) {
+      return;
+    }
+    if (highlight) {
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = segmentColor;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, baseMarkerRadius * 1.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    drawMarker(point, {
+      baseOpacity: highlight ? 0.34 : 0.24,
+      radius: baseMarkerRadius * 0.72,
+    });
+  };
+
+  drawInfos.forEach((info) => {
+    const shouldDraw = showFullScene || info.index === activeCopyIndex;
+    if (!shouldDraw) {
+      return;
+    }
+    info.soundIsoPoints.forEach((point, index) => {
+      const highlight = index === 0 && view2d.highlightFirstEvent;
+      drawSoundMarker(point, { highlight });
+    });
   });
 
   if (movingIsoPoint) {
