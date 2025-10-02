@@ -1705,6 +1705,9 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     const frontShade = info.facing ? 0.26 : 0.14;
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
+    const highlightFirstCopy = info.index === 0;
+    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.92)';
+    const highlightLineWidth = Math.max(0.7, canvas.width * 0.001);
     if (isLineShape && info.lineSegment) {
       ctx.save();
       ctx.strokeStyle = `rgba(93, 42, 44, ${strokeAlpha})`;
@@ -1713,6 +1716,11 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       ctx.moveTo(info.lineSegment.start.x, info.lineSegment.start.y);
       ctx.lineTo(info.lineSegment.end.x, info.lineSegment.end.y);
       ctx.stroke();
+      if (highlightFirstCopy) {
+        ctx.strokeStyle = highlightStrokeStyle;
+        ctx.lineWidth = highlightLineWidth;
+        ctx.stroke();
+      }
       ctx.restore();
       return;
     }
@@ -1727,6 +1735,11 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
       }
       ctx.closePath();
       ctx.stroke();
+      if (highlightFirstCopy) {
+        ctx.strokeStyle = highlightStrokeStyle;
+        ctx.lineWidth = highlightLineWidth;
+        ctx.stroke();
+      }
       ctx.restore();
       return;
     }
@@ -1742,6 +1755,11 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     ctx.strokeStyle = `rgba(93, 42, 44, ${strokeAlpha})`;
     ctx.lineWidth = Math.max(1.6, canvas.width * (isActive ? 0.0024 : 0.0016));
     ctx.stroke();
+    if (highlightFirstCopy) {
+      ctx.strokeStyle = highlightStrokeStyle;
+      ctx.lineWidth = highlightLineWidth;
+      ctx.stroke();
+    }
     ctx.restore();
   };
 
@@ -2154,6 +2172,9 @@ function drawNadaiQuadrant3d(config, elapsed) {
     const frontShade = info.facing ? 0.26 : 0.14;
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
+    const highlightFirstCopy = info.index === 0;
+    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.92)';
+    const highlightLineWidth = Math.max(0.7, canvas.width * 0.001);
     if (isLineShape && info.lineSegment) {
       ctx.save();
       ctx.strokeStyle = `rgba(60, 47, 87, ${strokeAlpha})`;
@@ -2162,6 +2183,11 @@ function drawNadaiQuadrant3d(config, elapsed) {
       ctx.moveTo(info.lineSegment.start.x, info.lineSegment.start.y);
       ctx.lineTo(info.lineSegment.end.x, info.lineSegment.end.y);
       ctx.stroke();
+      if (highlightFirstCopy) {
+        ctx.strokeStyle = highlightStrokeStyle;
+        ctx.lineWidth = highlightLineWidth;
+        ctx.stroke();
+      }
       ctx.restore();
       return;
     }
@@ -2176,6 +2202,11 @@ function drawNadaiQuadrant3d(config, elapsed) {
       }
       ctx.closePath();
       ctx.stroke();
+      if (highlightFirstCopy) {
+        ctx.strokeStyle = highlightStrokeStyle;
+        ctx.lineWidth = highlightLineWidth;
+        ctx.stroke();
+      }
       ctx.restore();
       return;
     }
@@ -2191,6 +2222,11 @@ function drawNadaiQuadrant3d(config, elapsed) {
     ctx.strokeStyle = `rgba(60, 47, 87, ${strokeAlpha})`;
     ctx.lineWidth = Math.max(1.6, canvas.width * (isActive ? 0.0024 : 0.0016));
     ctx.stroke();
+    if (highlightFirstCopy) {
+      ctx.strokeStyle = highlightStrokeStyle;
+      ctx.lineWidth = highlightLineWidth;
+      ctx.stroke();
+    }
     ctx.restore();
   };
 
