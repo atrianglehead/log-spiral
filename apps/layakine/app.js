@@ -67,6 +67,30 @@ const muteState = {
   nadai: false,
 };
 
+function formatMuteTargetLabel(target = '') {
+  if (!target) {
+    return '';
+  }
+  return target.charAt(0).toUpperCase() + target.slice(1);
+}
+
+function updateMuteButtonState(button, isMuted) {
+  const target = button.dataset.target;
+  button.classList.toggle('active', isMuted);
+  button.setAttribute('aria-pressed', isMuted ? 'true' : 'false');
+  const friendlyTarget = formatMuteTargetLabel(target);
+  if (friendlyTarget) {
+    const action = isMuted ? 'Unmute' : 'Mute';
+    button.setAttribute('aria-label', `${action} ${friendlyTarget}`);
+  }
+  const label = button.querySelector('.mute-label');
+  if (label) {
+    label.textContent = isMuted ? 'Muted' : 'Mute';
+  } else {
+    button.textContent = isMuted ? 'Muted' : 'Mute';
+  }
+}
+
 const voices = {
   laya: {
     wave: 'sine',
@@ -242,20 +266,11 @@ function scheduleAudio() {
   });
 }
 
-let lastQuadrantTabWidth = 0;
-let lastQuadrantTabHeight = 0;
-
 function updateQuadrantTabSizing(rect) {
   if (!rect) {
     return;
   }
   const { width, height } = rect;
-  if (width === lastQuadrantTabWidth && height === lastQuadrantTabHeight) {
-    return;
-  }
-  lastQuadrantTabWidth = width;
-  lastQuadrantTabHeight = height;
-
   const quadrantWidth = width / 2;
   const quadrantHeight = height / 2;
   const maxWidth = quadrantWidth / 3;
@@ -264,8 +279,9 @@ function updateQuadrantTabSizing(rect) {
   const measurements = quadrantTabs.map((tab) => {
     tab.style.setProperty('--quadrant-tab-max-width', `${maxWidth}px`);
     tab.style.setProperty('--quadrant-tab-max-height', `${maxHeight}px`);
-
-    tab.style.transform = 'none';
+    tab.style.setProperty('--quadrant-tab-scale', '1');
+    tab.style.setProperty('--quadrant-tab-translate-x', '0px');
+    tab.style.setProperty('--quadrant-tab-translate-y', '0px');
     const { width: naturalWidth, height: naturalHeight } = tab.getBoundingClientRect();
 
     return { tab, naturalWidth, naturalHeight };
@@ -287,7 +303,7 @@ function updateQuadrantTabSizing(rect) {
 
   measurements.forEach(({ tab, naturalWidth, naturalHeight }) => {
     if (!naturalWidth || !naturalHeight) {
-      tab.style.transform = '';
+      tab.style.setProperty('--quadrant-tab-scale', '1');
       return;
     }
 
@@ -302,11 +318,37 @@ function updateQuadrantTabSizing(rect) {
       }
     }
 
-    if (scale < 1) {
-      tab.style.transform = `scale(${scale})`;
-    } else {
-      tab.style.transform = '';
+    tab.style.setProperty('--quadrant-tab-scale', `${scale}`);
+  });
+
+  const canvasRect = rect;
+
+  quadrantTabs.forEach((tab) => {
+    const computed = getComputedStyle(tab);
+    const scale = Number.parseFloat(computed.getPropertyValue('--quadrant-tab-scale')) || 1;
+    const tabRect = tab.getBoundingClientRect();
+    let shiftX = 0;
+    let shiftY = 0;
+
+    if (tabRect.left < canvasRect.left) {
+      shiftX = canvasRect.left - tabRect.left;
+    } else if (tabRect.right > canvasRect.right) {
+      shiftX = canvasRect.right - tabRect.right;
     }
+
+    if (tabRect.top < canvasRect.top) {
+      shiftY = canvasRect.top - tabRect.top;
+    } else if (tabRect.bottom > canvasRect.bottom) {
+      shiftY = canvasRect.bottom - tabRect.bottom;
+    }
+
+    if (scale !== 0) {
+      shiftX /= scale;
+      shiftY /= scale;
+    }
+
+    tab.style.setProperty('--quadrant-tab-translate-x', `${shiftX}px`);
+    tab.style.setProperty('--quadrant-tab-translate-y', `${shiftY}px`);
   });
 }
 
@@ -2732,12 +2774,18 @@ Object.entries(sliders).forEach(([name, input]) => {
 });
 
 muteButtons.forEach((button) => {
+  const target = button.dataset.target;
+  if (target && target in muteState) {
+    updateMuteButtonState(button, muteState[target]);
+  }
   button.addEventListener('click', () => {
-    const target = button.dataset.target;
-    muteState[target] = !muteState[target];
-    button.classList.toggle('active', muteState[target]);
-    button.setAttribute('aria-pressed', muteState[target] ? 'true' : 'false');
-    button.textContent = muteState[target] ? 'Muted' : 'Mute';
+    const clickedTarget = button.dataset.target;
+    if (!clickedTarget || !(clickedTarget in muteState)) {
+      return;
+    }
+    muteState[clickedTarget] = !muteState[clickedTarget];
+    updateMuteButtonState(button, muteState[clickedTarget]);
+    updateQuadrantTabSizing(canvas.getBoundingClientRect());
   });
 });
 

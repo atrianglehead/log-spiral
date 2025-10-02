@@ -106,9 +106,13 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
+      min-width: 64px;
+      flex-shrink: 0;
     }
-    .mute-label-short {
-      display: none;
+    .mute-label {
+      display: inline-block;
+      text-align: center;
+      width: 100%;
     }
     .mute.active {
       background: var(--control-color);
@@ -166,6 +170,9 @@
     .quadrant-tabs {
       --quadrant-tab-max-width: none;
       --quadrant-tab-max-height: none;
+      --quadrant-tab-translate-x: 0px;
+      --quadrant-tab-translate-y: 0px;
+      --quadrant-tab-scale: 1;
       position: absolute;
       display: inline-flex;
       gap: 4px;
@@ -179,6 +186,9 @@
       max-width: var(--quadrant-tab-max-width, none);
       max-height: var(--quadrant-tab-max-height, none);
       transform-origin: top left;
+      transform: translate(var(--quadrant-tab-translate-x), var(--quadrant-tab-translate-y))
+        scale(var(--quadrant-tab-scale));
+      will-change: transform;
     }
     .quadrant-option {
       position: absolute;
@@ -320,13 +330,7 @@
       .mute {
         font-size: 0.6rem;
         padding: 4px 8px;
-        min-width: 28px;
-      }
-      .mute-label-full {
-        display: none;
-      }
-      .mute-label-short {
-        display: inline;
+        width: 64px;
       }
       .value {
         font-size: 0.72rem;
@@ -394,15 +398,19 @@
     <section class="control-strip" aria-label="Gati and Jati controls">
       <div class="control" data-kind="gati">
         <label for="gati">Gati</label>
-        <button class="mute" data-target="gati" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="gati" type="range" min="1" max="13" step="1" value="4" />
         <span class="value" data-for="gati">4</span>
+        <button class="mute" data-target="gati" aria-pressed="false" aria-label="Toggle gati mute">
+          <span class="mute-label">Mute</span>
+        </button>
       </div>
       <div class="control" data-kind="jati">
         <label for="jati">Jati</label>
-        <button class="mute" data-target="jati" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="jati" type="range" min="1" max="13" step="1" value="3" />
         <span class="value" data-for="jati">3</span>
+        <button class="mute" data-target="jati" aria-pressed="false" aria-label="Toggle jati mute">
+          <span class="mute-label">Mute</span>
+        </button>
       </div>
     </section>
     <div class="canvas-wrapper">
@@ -432,15 +440,19 @@
     <section class="control-strip" aria-label="Laya and Nadai controls">
       <div class="control" data-kind="laya">
         <label for="laya">Laya</label>
-        <button class="mute" data-target="laya" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="laya" type="range" min="30" max="120" step="1" value="40" />
         <span class="value" data-for="laya">40 bpm</span>
+        <button class="mute" data-target="laya" aria-pressed="false" aria-label="Toggle laya mute">
+          <span class="mute-label">Mute</span>
+        </button>
       </div>
       <div class="control" data-kind="nadai">
         <label for="nadai">Nadai</label>
-        <button class="mute" data-target="nadai" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="nadai" type="range" min="1" max="13" step="1" value="1" />
         <span class="value" data-for="nadai">1</span>
+        <button class="mute" data-target="nadai" aria-pressed="false" aria-label="Toggle nadai mute">
+          <span class="mute-label">Mute</span>
+        </button>
       </div>
     </section>
   </main>
