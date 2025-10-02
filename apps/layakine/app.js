@@ -286,6 +286,7 @@ function updateQuadrantTabSizing(rect) {
 
   const desiredMarginX = clamp(quadrantWidth * 0.08, 12, 40);
   const desiredMarginY = clamp(quadrantHeight * 0.08, 12, 40);
+  const maxTabWidthRatio = 0.85;
   const availableMarginX = Math.max(0, quadrantWidth / 2 - 6);
   const availableMarginY = Math.max(0, quadrantHeight / 2 - 6);
   const minimumMarginX = availableMarginX > 0 ? clamp(quadrantWidth * 0.02, 6, 14) : 0;
@@ -409,7 +410,7 @@ function updateQuadrantTabSizing(rect) {
     const gatiBounds = quadrantBounds.gati || fallbackBounds;
     const gatiMaxWidth = Math.min(
       Math.max(0, gatiBounds.right - gatiBounds.left),
-      Math.max(0, quadrantWidth * 0.4),
+      Math.max(0, quadrantWidth * maxTabWidthRatio),
     );
     const gatiMetrics = computeMetricsForTab(gatiEntry, gatiBounds, null, gatiMaxWidth);
     metricsByTab.set(gatiEntry.tab, gatiMetrics);
@@ -423,7 +424,7 @@ function updateQuadrantTabSizing(rect) {
     const bounds = quadrantBounds[entry.tab.dataset.quadrant] || fallbackBounds;
     const maxWidth = Math.min(
       Math.max(0, bounds.right - bounds.left),
-      Math.max(0, quadrantWidth * 0.4),
+      Math.max(0, quadrantWidth * maxTabWidthRatio),
     );
     const metrics = computeMetricsForTab(entry, bounds, gatiTargetHeight, maxWidth);
     metricsByTab.set(entry.tab, metrics);
