@@ -269,29 +269,60 @@
       background: rgba(40, 40, 40, 0.85);
     }
     @media (max-width: 720px) {
-      main { padding: 16px 12px 24px; }
+      body { overflow-y: auto; }
+      main {
+        padding: 16px 12px 24px;
+        gap: 12px;
+      }
+      h1 {
+        font-size: 1.2rem;
+        letter-spacing: 0.04em;
+      }
       .control-strip {
         grid-template-columns: 1fr;
         padding: 10px 12px;
+        border-radius: 10px;
       }
       .control-strip::after { display: none; }
       .control {
         padding: 10px 12px;
+        gap: 8px;
       }
       .control-strip > .control:first-child,
       .control-strip > .control:last-child {
         padding-left: 12px;
         padding-right: 12px;
       }
+      .control label {
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        min-width: 44px;
+      }
+      .mute {
+        font-size: 0.68rem;
+        padding: 5px 10px;
+      }
+      .value {
+        font-size: 0.78rem;
+        min-width: 44px;
+      }
       .control + .control {
         border-top: 1px solid var(--line);
         margin-top: 12px;
         padding-top: 16px;
       }
+      input[type="range"] {
+        min-height: 24px;
+      }
       #play-toggle { width: 56px; height: 56px; font-size: 1.2rem; }
+      .canvas-wrapper {
+        padding: 12px;
+        min-height: 50vh;
+      }
       .quadrant-tabs {
         top: auto;
         left: auto;
+        padding: 3px;
       }
       .quadrant-tabs.top-left {
         top: 16px;
@@ -300,6 +331,10 @@
       .quadrant-tabs.top-right {
         top: 16px;
         left: calc(50% + 12px);
+      }
+      .quadrant-tabs button {
+        font-size: 0.68rem;
+        padding: 5px 10px;
       }
       .quadrant-option.top-right {
         top: 68px;
