@@ -164,6 +164,8 @@
       padding: 16px;
     }
     .quadrant-tabs {
+      --quadrant-tab-max-width: none;
+      --quadrant-tab-max-height: none;
       position: absolute;
       display: inline-flex;
       gap: 4px;
@@ -174,6 +176,9 @@
       z-index: 3;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
       backdrop-filter: blur(6px);
+      max-width: var(--quadrant-tab-max-width, none);
+      max-height: var(--quadrant-tab-max-height, none);
+      transform-origin: top left;
     }
     .quadrant-option {
       position: absolute;
@@ -232,11 +237,14 @@
     }
     .quadrant-tabs.top-right {
       top: 24px;
-      left: calc(50% + 24px);
+      right: 24px;
+      left: auto;
+      transform-origin: top right;
     }
     .quadrant-option.top-right {
       top: 80px;
-      left: calc(50% + 28px);
+      right: 28px;
+      left: auto;
     }
     .quadrant-tabs.bottom-left {
       top: calc(50% + 24px);
@@ -244,7 +252,9 @@
     }
     .quadrant-tabs.bottom-right {
       top: calc(50% + 24px);
-      left: calc(50% + 24px);
+      right: 24px;
+      left: auto;
+      transform-origin: top right;
     }
     canvas {
       width: 100%;
@@ -351,7 +361,9 @@
       }
       .quadrant-tabs.top-right {
         top: 16px;
-        left: calc(50% + 12px);
+        right: 12px;
+        left: auto;
+        transform-origin: top right;
       }
       .quadrant-tabs button {
         font-size: 0.6rem;
@@ -360,7 +372,8 @@
       }
       .quadrant-option.top-right {
         top: 68px;
-        left: calc(50% + 16px);
+        right: 16px;
+        left: auto;
       }
       .quadrant-tabs.bottom-left {
         top: calc(50% + 12px);
@@ -368,7 +381,9 @@
       }
       .quadrant-tabs.bottom-right {
         top: calc(50% + 12px);
-        left: calc(50% + 12px);
+        right: 12px;
+        left: auto;
+        transform-origin: top right;
       }
     }
   </style>

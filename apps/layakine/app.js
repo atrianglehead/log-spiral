@@ -20,6 +20,7 @@ const valueLabels = {
 };
 const muteButtons = Array.from(document.querySelectorAll('.mute'));
 const modeButtons = Array.from(document.querySelectorAll('.mode-tab'));
+const quadrantTabs = Array.from(document.querySelectorAll('.quadrant-tabs'));
 
 const quadrantModes = {
   laya: '1d',
@@ -241,8 +242,77 @@ function scheduleAudio() {
   });
 }
 
+let lastQuadrantTabWidth = 0;
+let lastQuadrantTabHeight = 0;
+
+function updateQuadrantTabSizing(rect) {
+  if (!rect) {
+    return;
+  }
+  const { width, height } = rect;
+  if (width === lastQuadrantTabWidth && height === lastQuadrantTabHeight) {
+    return;
+  }
+  lastQuadrantTabWidth = width;
+  lastQuadrantTabHeight = height;
+
+  const quadrantWidth = width / 2;
+  const quadrantHeight = height / 2;
+  const maxWidth = quadrantWidth / 3;
+  const maxHeight = quadrantHeight / 6;
+
+  const measurements = quadrantTabs.map((tab) => {
+    tab.style.setProperty('--quadrant-tab-max-width', `${maxWidth}px`);
+    tab.style.setProperty('--quadrant-tab-max-height', `${maxHeight}px`);
+
+    tab.style.transform = 'none';
+    const { width: naturalWidth, height: naturalHeight } = tab.getBoundingClientRect();
+
+    return { tab, naturalWidth, naturalHeight };
+  });
+
+  const gatiMeasurement = measurements.find(({ tab }) => tab.dataset.quadrant === 'gati');
+  let gatiTargetHeight = null;
+
+  if (
+    gatiMeasurement &&
+    gatiMeasurement.naturalWidth > 0 &&
+    gatiMeasurement.naturalHeight > 0
+  ) {
+    const gatiWidthScale = maxWidth > 0 ? maxWidth / gatiMeasurement.naturalWidth : 1;
+    const gatiHeightScale = maxHeight > 0 ? maxHeight / gatiMeasurement.naturalHeight : 1;
+    const gatiScale = Math.min(1, gatiWidthScale, gatiHeightScale);
+    gatiTargetHeight = gatiMeasurement.naturalHeight * gatiScale;
+  }
+
+  measurements.forEach(({ tab, naturalWidth, naturalHeight }) => {
+    if (!naturalWidth || !naturalHeight) {
+      tab.style.transform = '';
+      return;
+    }
+
+    const widthScale = maxWidth > 0 ? maxWidth / naturalWidth : 1;
+    const heightScale = maxHeight > 0 ? maxHeight / naturalHeight : 1;
+    let scale = Math.min(1, widthScale, heightScale);
+
+    if (gatiTargetHeight && naturalHeight > 0) {
+      const matchGatiScale = gatiTargetHeight / naturalHeight;
+      if (Number.isFinite(matchGatiScale) && matchGatiScale > 0) {
+        scale = Math.min(scale, matchGatiScale, 1);
+      }
+    }
+
+    if (scale < 1) {
+      tab.style.transform = `scale(${scale})`;
+    } else {
+      tab.style.transform = '';
+    }
+  });
+}
+
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
+  updateQuadrantTabSizing(rect);
   const dpr = window.devicePixelRatio || 1;
   const width = Math.floor(rect.width * dpr);
   const height = Math.floor(rect.height * dpr);
