@@ -1755,119 +1755,38 @@ function drawNadaiQuadrant3d(config, elapsed) {
   }
 
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(orientation);
-  const baseCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
-  const isoOrigin = { x: offsetX + width * 0.46, y: offsetY + height * 0.72 };
-  const scale = 0.82;
+  const origin = { x: offsetX + width * 0.54, y: offsetY + height * 0.68 };
+  const baseRadius = Math.min(width, height) * 0.22;
+  const shapeRadius = baseRadius * 0.55;
+  const crossSectionData = buildJatiCrossSection(view2d, shapeRadius);
+  const shapePoints = crossSectionData.points;
+  if (shapePoints.length < 2) {
+    return;
+  }
+
   const strokeColor = getStrokeColor('nadai');
   const segmentColor = getSegmentColor('nadai');
-  const baseRadius = Math.min(width, height) * 0.32;
-  const baseMarkerRadius = Math.max(3, canvas.width * 0.0045);
-  const surfaceHeight = Math.max(2, baseMarkerRadius * 0.6);
-  const eventHeight = surfaceHeight;
-
-  const project = (point, heightOffset = 0) =>
-    projectPointToIsometric(point, baseCenter, isoOrigin, scale, heightOffset);
-
-  const baseCorners = [
-    { x: baseCenter.x - baseRadius, y: baseCenter.y - baseRadius },
-    { x: baseCenter.x + baseRadius, y: baseCenter.y - baseRadius },
-    { x: baseCenter.x + baseRadius, y: baseCenter.y + baseRadius },
-    { x: baseCenter.x - baseRadius, y: baseCenter.y + baseRadius },
-  ];
-  const isoCorners = baseCorners.map((corner) => project(corner, 0));
-  const farTopIndex = isoCorners.reduce(
-    (best, corner, index) => (corner.y < isoCorners[best].y ? index : best),
-    0,
+  const scale = 1;
+  const verticalScale = 0.9;
+  const baseLift = crossSectionData.maxY;
+  const isLineShape = view2d.shape === 'line';
+  const isCircleShape = view2d.shape === 'circle';
+  const minLocalX = shapePoints.reduce(
+    (minX, point) => (point.x < minX ? point.x : minX),
+    Number.POSITIVE_INFINITY,
   );
-  const farRightIndex = isoCorners.reduce(
-    (best, corner, index) => (corner.x > isoCorners[best].x ? index : best),
-    0,
+  const maxLocalX = shapePoints.reduce(
+    (maxX, point) => (point.x > maxX ? point.x : maxX),
+    Number.NEGATIVE_INFINITY,
   );
-  const farTopCorner = baseCorners[farTopIndex];
-  const farRightCorner = baseCorners[farRightIndex];
-  const topEdgeMidpoint = lerpPoint(farTopCorner, farRightCorner, 0.5);
-  const radialMargin = 0.16;
-  const directionToTop = {
-    x: topEdgeMidpoint.x - baseCenter.x,
-    y: topEdgeMidpoint.y - baseCenter.y,
-  };
-  const directionLength = Math.hypot(directionToTop.x, directionToTop.y) || 1;
-  const directionUnit = {
-    x: directionToTop.x / directionLength,
-    y: directionToTop.y / directionLength,
-  };
-  const baseShapeRadius = directionLength * (1 - radialMargin);
-  const baseOrientationAngle = Math.atan2(directionUnit.y, directionUnit.x);
-  const stationarySoundCircle = baseCenter;
-
-  const safeGatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
-  const copyCount = safeGatiCount;
-  const axisRotationStep = copyCount > 0 ? (Math.PI * 2) / copyCount : 0;
-  const radiusScale =
-    copyCount === 1 ? 1 : Math.max(0.32, 1 / (1 + (copyCount - 1) * 0.55));
-  const shapeRadius = baseShapeRadius * radiusScale;
-
-  const drawMarker = (point, options = {}) => {
-    const {
-      height: heightOffset = eventHeight,
-      radius = baseMarkerRadius,
-      color = segmentColor,
-      stroke = strokeColor,
-      baseOpacity = 0.2,
-    } = options;
-    const top = project(point, heightOffset);
-    ctx.save();
-    if (baseOpacity > 0) {
-      ctx.globalAlpha = baseOpacity;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(top.x, top.y, radius * 1.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(top.x, top.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = Math.max(1, radius * 0.45);
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  const drawBasePlane = () => {
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(isoCorners[0].x, isoCorners[0].y);
-    for (let i = 1; i < isoCorners.length; i += 1) {
-      ctx.lineTo(isoCorners[i].x, isoCorners[i].y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(44, 28, 70, 0.72)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-    ctx.beginPath();
-    ctx.moveTo(isoCorners[0].x, isoCorners[0].y);
-    ctx.lineTo(isoCorners[2].x, isoCorners[2].y);
-    ctx.moveTo(isoCorners[1].x, isoCorners[1].y);
-    ctx.lineTo(isoCorners[3].x, isoCorners[3].y);
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  drawBasePlane();
+  const gatiCount = Math.max(1, Math.floor(rawGatiCount) || 1);
+  const copyCount = gatiCount;
+  const showFullScene = true;
 
   const segmentDuration = view2d.segmentDuration || 0;
-  const segmentCount = view2d.segmentCount || 1;
-  const fallbackCycle = segmentDuration * Math.max(1, segmentCount);
-  const singleCycle = cycleDuration > 0 ? cycleDuration : fallbackCycle;
-  const copyCycle = singleCycle;
+  const cycleSegments = view2d.segmentCount || 1;
+  const fallbackCycle = segmentDuration * Math.max(1, cycleSegments);
+  const copyCycle = fallbackCycle > 0 ? fallbackCycle : cycleDuration > 0 ? cycleDuration : 0;
   const totalCycle = copyCycle > 0 ? copyCycle * copyCount : 0;
 
   let activeCopyIndex = 0;
@@ -1878,313 +1797,408 @@ function drawNadaiQuadrant3d(config, elapsed) {
     copyElapsed = wrapped - activeCopyIndex * copyCycle;
   }
 
-  const angleStep = copyCount > 1 ? (Math.PI * 2) / copyCount : 0;
-  const isCenterPoint = (point) =>
-    Math.hypot(point.x - baseCenter.x, point.y - baseCenter.y) < 0.5;
+  const baseAngle = -Math.PI / 2;
+  const angleStep = copyCount > 0 ? (Math.PI * 2) / copyCount : 0;
 
-  let centerMarkerDrawn = false;
-  const ensureCenterMarker = () => {
-    if (!centerMarkerDrawn) {
-      drawMarker(baseCenter, {
-        height: eventHeight,
-        radius: baseMarkerRadius * (copyCount > 1 ? 1.45 : 1.2),
-        baseOpacity: 0.38,
-      });
-      centerMarkerDrawn = true;
+  const innerPointIndex = shapePoints.reduce(
+    (bestIndex, point, index) => (point.x < shapePoints[bestIndex].x ? index : bestIndex),
+    0,
+  );
+  const epsilon = 1e-6;
+  const innerPointLocalX = shapePoints[innerPointIndex]?.x ?? 0;
+  const innerPointCandidates = shapePoints
+    .map((pt, index) => ({ pt, index }))
+    .filter(({ pt }) => Math.abs(pt.x - innerPointLocalX) < epsilon);
+
+  const primaryInnerCandidate = (() => {
+    if (!innerPointCandidates.length) {
+      return null;
     }
-  };
-
-  const rotatePointForCopy = (point, rotationContext, rotationAngle) => {
-    if (
-      !rotationContext ||
-      !rotationContext.axisUnit ||
-      !Number.isFinite(rotationAngle) ||
-      Math.abs(rotationAngle) < 1e-12
-    ) {
-      return { x: point.x, y: point.y, height: 0 };
+    const directMatch = innerPointCandidates.find(({ index }) => index === innerPointIndex);
+    if (directMatch) {
+      return directMatch;
     }
-    return rotatePointAroundAxisOnPlane(point, rotationContext, rotationAngle);
+    return innerPointCandidates.reduce((best, candidate) =>
+      candidate.pt.y > best.pt.y ? candidate : best,
+    innerPointCandidates[0]);
+  })();
+
+  const referenceInnerPoint = primaryInnerCandidate?.pt ?? shapePoints[innerPointIndex] ?? {
+    x: innerPointLocalX,
+    y: 0,
   };
+  const referenceInnerIndex = primaryInnerCandidate?.index ?? innerPointIndex;
 
-  const projectRotatedPoint = (
-    point,
-    rotationContext,
-    rotationAngle,
-    baseHeight = eventHeight,
-  ) => {
-    const rotated = rotatePointForCopy(point, rotationContext, rotationAngle);
-    return project({ x: rotated.x, y: rotated.y }, baseHeight + rotated.height);
+  const soundCircleRadius = baseRadius + innerPointLocalX;
+  const soundWorldPoint = {
+    x: soundCircleRadius * Math.cos(baseAngle),
+    y: baseLift - referenceInnerPoint.y,
+    z: soundCircleRadius * Math.sin(baseAngle),
   };
+  let soundIsoPoint = projectPointIso3d(soundWorldPoint, origin, scale, verticalScale);
 
-  const drawRotatedMarker = (
-    point,
-    rotationContext,
-    rotationAngle,
-    options = {},
-  ) => {
-    const rotated = rotatePointForCopy(point, rotationContext, rotationAngle);
-    const baseHeight = options.height ?? eventHeight;
-    drawMarker(
-      { x: rotated.x, y: rotated.y },
-      {
-        ...options,
-        height: baseHeight + rotated.height,
-      },
-    );
-  };
+  const baseMarkerRadius = Math.max(4, canvas.width * 0.0046);
 
-  const processEventPoint = (point, rotationContext, rotationAngle) => {
-    if (isCenterPoint(point)) {
-      ensureCenterMarker();
-    } else {
-      drawRotatedMarker(point, rotationContext, rotationAngle);
-    }
-  };
-
-  const drawLineCopy = (rotation, copyIndex) => {
-    const direction = { x: Math.cos(rotation), y: Math.sin(rotation) };
-    const start = baseCenter;
-    const length = shapeRadius * 2;
-    const end = {
-      x: start.x - direction.x * length,
-      y: start.y - direction.y * length,
-    };
-    const rotationAngle3d = axisRotationStep * copyIndex;
-    const copyCenter = {
-      x: (start.x + end.x) / 2,
-      y: (start.y + end.y) / 2,
-    };
-    const rotationContext = createAxisRotationContext(
-      stationarySoundCircle,
-      copyCenter,
-    );
-    const isoStart = projectRotatedPoint(start, rotationContext, rotationAngle3d);
-    const isoEnd = projectRotatedPoint(end, rotationContext, rotationAngle3d);
-
+  const drawMarker = (point, options = {}) => {
+    const {
+      color = segmentColor,
+      stroke = strokeColor,
+      baseOpacity = 0.25,
+      radius = baseMarkerRadius,
+    } = options;
     ctx.save();
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 3;
-    ctx.lineJoin = 'round';
+    if (baseOpacity > 0) {
+      ctx.globalAlpha = baseOpacity;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius * 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(isoStart.x, isoStart.y);
-    ctx.lineTo(isoEnd.x, isoEnd.y);
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, radius * 0.35);
     ctx.stroke();
     ctx.restore();
-
-    const eventPoints = getLineSoundPoints(start, end, view2d, view2d.soundMarkers);
-    if (eventPoints.length === 0) {
-      ensureCenterMarker();
-    }
-    eventPoints.forEach((point) =>
-      processEventPoint(point, rotationContext, rotationAngle3d),
-    );
-
-    if (!(segmentDuration > 0) || !(copyCycle > 0)) {
-      const staticPoint = eventPoints[0] || start;
-      drawRotatedMarker(staticPoint, rotationContext, rotationAngle3d, {
-        radius: baseMarkerRadius * 1.2,
-        baseOpacity: 0.28,
-      });
-      return;
-    }
-
-    if (copyIndex !== activeCopyIndex) {
-      return;
-    }
-
-    let progressPoint = start;
-    if (view2d.bounce) {
-      const bounceCycle = segmentDuration * 2;
-      if (bounceCycle > 0) {
-        const local = copyElapsed % bounceCycle;
-        const index = Math.floor(local / segmentDuration);
-        const t = (local - index * segmentDuration) / segmentDuration;
-        progressPoint =
-          index % 2 === 0 ? lerpPoint(start, end, t) : lerpPoint(end, start, t);
-      }
-    } else if (view2d.segmentCount && view2d.segmentCount > 1) {
-      const cycle = segmentDuration * view2d.segmentCount;
-      if (cycle > 0) {
-        const local = copyElapsed % cycle;
-        const index = Math.floor(local / segmentDuration);
-        const t = (local - index * segmentDuration) / segmentDuration;
-        progressPoint = lerpPoint(start, end, t);
-      }
-    } else if (segmentDuration > 0) {
-      const local = copyElapsed % segmentDuration;
-      const t = segmentDuration > 0 ? local / segmentDuration : 0;
-      progressPoint = lerpPoint(start, end, t);
-    }
-
-    drawRotatedMarker(progressPoint, rotationContext, rotationAngle3d, {
-      radius: baseMarkerRadius * 1.25,
-      baseOpacity: 0.32,
-    });
   };
 
-  const drawPolygonCopy = (rotation, copyIndex) => {
-    const sides = Math.max(3, Math.floor(view2d.sides) || 3);
-    const direction = { x: Math.cos(rotation), y: Math.sin(rotation) };
-    const center = {
-      x: baseCenter.x - direction.x * shapeRadius,
-      y: baseCenter.y - direction.y * shapeRadius,
+  const copyInfos = Array.from({ length: copyCount }, (_, index) => {
+    const angle = baseAngle + angleStep * index;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const basePoint = { x: cos * baseRadius, y: 0, z: sin * baseRadius };
+    const isoBase = projectPointIso3d(basePoint, origin, scale, verticalScale);
+
+    const points = shapePoints.map((pt, pointIndex) => {
+      const radialDistance = baseRadius + pt.x;
+      const worldPoint = {
+        x: radialDistance * cos,
+        y: baseLift - pt.y,
+        z: radialDistance * sin,
+      };
+      const isoPoint = projectPointIso3d(worldPoint, origin, scale, verticalScale);
+      return {
+        pointIndex,
+        local: pt,
+        world: worldPoint,
+        iso: isoPoint,
+      };
+    });
+
+    const innerPointIsos = points.filter((pt) => Math.abs(pt.local.x - innerPointLocalX) < epsilon);
+    let referenceIso = null;
+    const directReference = points.find((pt) => pt.pointIndex === referenceInnerIndex);
+    if (directReference) {
+      referenceIso = directReference.iso;
+    } else if (innerPointIsos.length > 0) {
+      const sum = innerPointIsos.reduce(
+        (acc, pt) => ({ x: acc.x + pt.iso.x, y: acc.y + pt.iso.y }),
+        { x: 0, y: 0 },
+      );
+      referenceIso = { x: sum.x / innerPointIsos.length, y: sum.y / innerPointIsos.length };
+    } else if (points[innerPointIndex]) {
+      referenceIso = points[innerPointIndex].iso;
+    }
+
+    const offset = referenceIso
+      ? {
+          x: soundIsoPoint.x - referenceIso.x,
+          y: soundIsoPoint.y - referenceIso.y,
+        }
+      : { x: 0, y: 0 };
+
+    const translatedPoints = points.map((pt) => ({
+      ...pt,
+      iso: { x: pt.iso.x + offset.x, y: pt.iso.y + offset.y },
+    }));
+    const translatedIsoBase = { x: isoBase.x + offset.x, y: isoBase.y + offset.y };
+
+    const pointCount = translatedPoints.length;
+    const pathIsoPoints = [];
+    for (let i = 0; i <= pointCount; i += 1) {
+      const point = translatedPoints[(innerPointIndex + i) % pointCount];
+      pathIsoPoints.push(point.iso);
+    }
+
+    const pathSegmentLengths = [];
+    let pathTotalLength = 0;
+    for (let i = 0; i < pathIsoPoints.length - 1; i += 1) {
+      const from = pathIsoPoints[i];
+      const to = pathIsoPoints[i + 1];
+      const length = Math.hypot(to.x - from.x, to.y - from.y);
+      pathSegmentLengths.push(length);
+      pathTotalLength += length;
+    }
+
+    const radialTarget = translatedPoints.reduce((best, pt) => {
+      const bestDist = Math.hypot(best.iso.x - soundIsoPoint.x, best.iso.y - soundIsoPoint.y);
+      const dist = Math.hypot(pt.iso.x - soundIsoPoint.x, pt.iso.y - soundIsoPoint.y);
+      return dist > bestDist ? pt : best;
+    }, translatedPoints[0]);
+
+    let lineSegment = null;
+    if (isLineShape && Number.isFinite(minLocalX) && Number.isFinite(maxLocalX)) {
+      const epsilon = 1e-6;
+      const startCandidates = translatedPoints.filter(
+        (pt) => Math.abs(pt.local.x - minLocalX) < epsilon,
+      );
+      const endCandidates = translatedPoints.filter(
+        (pt) => Math.abs(pt.local.x - maxLocalX) < epsilon,
+      );
+      const averageIso = (candidates) => {
+        if (!candidates.length) {
+          return null;
+        }
+        const sum = candidates.reduce(
+          (acc, pt) => ({ x: acc.x + pt.iso.x, y: acc.y + pt.iso.y }),
+          { x: 0, y: 0 },
+        );
+        return { x: sum.x / candidates.length, y: sum.y / candidates.length };
+      };
+      const isoStart = averageIso(startCandidates);
+      const isoEnd = averageIso(endCandidates);
+      if (isoStart && isoEnd) {
+        const lineLength = Math.hypot(isoEnd.x - isoStart.x, isoEnd.y - isoStart.y);
+        lineSegment = { start: isoStart, end: isoEnd, length: lineLength };
+      }
+    }
+
+    if (lineSegment) {
+      return {
+        index,
+        angle,
+        cos,
+        sin,
+        depth: basePoint.z,
+        facing: cos >= 0,
+        isoBase: translatedIsoBase,
+        points: translatedPoints,
+        pathIsoPoints: [lineSegment.start, lineSegment.end],
+        pathSegmentLengths: [lineSegment.length],
+        pathTotalLength: lineSegment.length,
+        radialIso: lineSegment.end || translatedIsoBase,
+        lineSegment,
+      };
+    }
+
+    return {
+      index,
+      angle,
+      cos,
+      sin,
+      depth: basePoint.z,
+      facing: cos >= 0,
+      isoBase: translatedIsoBase,
+      points: translatedPoints,
+      pathIsoPoints,
+      pathSegmentLengths,
+      pathTotalLength,
+      radialIso: radialTarget?.iso || translatedIsoBase,
+      lineSegment: null,
     };
-    const points = [];
-    for (let i = 0; i < sides; i += 1) {
-      const angle = rotation + (i * 2 * Math.PI) / sides;
-      points.push({
-        x: center.x + shapeRadius * Math.cos(angle),
-        y: center.y + shapeRadius * Math.sin(angle),
+  });
+
+  const bounds = {
+    minX: Number.POSITIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+  };
+
+  const includePointInBounds = (point) => {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      return;
+    }
+    if (point.x < bounds.minX) bounds.minX = point.x;
+    if (point.y < bounds.minY) bounds.minY = point.y;
+    if (point.x > bounds.maxX) bounds.maxX = point.x;
+    if (point.y > bounds.maxY) bounds.maxY = point.y;
+  };
+
+  includePointInBounds(soundIsoPoint);
+  copyInfos.forEach((info) => {
+    includePointInBounds(info.isoBase);
+    includePointInBounds(info.radialIso);
+    info.pathIsoPoints.forEach(includePointInBounds);
+    info.points.forEach((pt) => includePointInBounds(pt.iso));
+    if (info.lineSegment) {
+      includePointInBounds(info.lineSegment.start);
+      includePointInBounds(info.lineSegment.end);
+    }
+  });
+
+  if (
+    Number.isFinite(bounds.minX) &&
+    Number.isFinite(bounds.minY) &&
+    Number.isFinite(bounds.maxX) &&
+    Number.isFinite(bounds.maxY)
+  ) {
+    const currentCenter = {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    };
+    const targetCenter = { x: offsetX + width / 2, y: offsetY + height / 2 };
+    const shift = {
+      x: targetCenter.x - currentCenter.x,
+      y: targetCenter.y - currentCenter.y,
+    };
+
+    if (Math.abs(shift.x) > 1e-6 || Math.abs(shift.y) > 1e-6) {
+      const translatePoint = (point) =>
+        point
+          ? {
+              x: point.x + shift.x,
+              y: point.y + shift.y,
+            }
+          : point;
+
+      soundIsoPoint = translatePoint(soundIsoPoint);
+      copyInfos.forEach((info) => {
+        info.isoBase = translatePoint(info.isoBase);
+        info.radialIso = translatePoint(info.radialIso);
+        info.pathIsoPoints = info.pathIsoPoints.map(translatePoint);
+        info.points = info.points.map((pt) => ({
+          ...pt,
+          iso: translatePoint(pt.iso),
+        }));
+        if (info.lineSegment) {
+          info.lineSegment = {
+            ...info.lineSegment,
+            start: translatePoint(info.lineSegment.start),
+            end: translatePoint(info.lineSegment.end),
+          };
+        }
       });
     }
-    const rotationAngle3d = axisRotationStep * copyIndex;
-    const rotationContext = createAxisRotationContext(
-      stationarySoundCircle,
-      center,
-    );
-    const isoPoints = points.map((pt) =>
-      projectRotatedPoint(pt, rotationContext, rotationAngle3d),
-    );
+  }
 
+  const drawInfos = [...copyInfos].sort((a, b) => a.depth - b.depth);
+
+  const drawShape = (info, options = {}) => {
+    const { activeCopyIndex: activeIndex } = options;
+    const isoPoints = info.points.map((pt) => pt.iso);
+    if (!isoPoints.length) {
+      return;
+    }
+    const isActive = info.index === activeIndex;
+    const frontShade = info.facing ? 0.26 : 0.14;
+    const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
+    const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
+    if (isLineShape && info.lineSegment) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(60, 47, 87, ${strokeAlpha})`;
+      ctx.lineWidth = Math.max(1.8, canvas.width * (isActive ? 0.0028 : 0.002));
+      ctx.beginPath();
+      ctx.moveTo(info.lineSegment.start.x, info.lineSegment.start.y);
+      ctx.lineTo(info.lineSegment.end.x, info.lineSegment.end.y);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    if (isCircleShape) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(60, 47, 87, ${strokeAlpha})`;
+      ctx.lineWidth = Math.max(1.8, canvas.width * (isActive ? 0.0026 : 0.0019));
+      ctx.beginPath();
+      ctx.moveTo(isoPoints[0].x, isoPoints[0].y);
+      for (let i = 1; i < isoPoints.length; i += 1) {
+        ctx.lineTo(isoPoints[i].x, isoPoints[i].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     ctx.save();
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 3;
-    ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(isoPoints[0].x, isoPoints[0].y);
     for (let i = 1; i < isoPoints.length; i += 1) {
       ctx.lineTo(isoPoints[i].x, isoPoints[i].y);
     }
     ctx.closePath();
+    ctx.fillStyle = `rgba(156, 106, 222, ${Math.min(0.85, baseAlpha + (isActive ? 0.18 : 0))})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(60, 47, 87, ${strokeAlpha})`;
+    ctx.lineWidth = Math.max(1.6, canvas.width * (isActive ? 0.0024 : 0.0016));
     ctx.stroke();
     ctx.restore();
-
-    const eventPoints = getPolygonSoundPoints(points, view2d.soundMarkers);
-    if (eventPoints.length === 0) {
-      ensureCenterMarker();
-    }
-    eventPoints.forEach((point) =>
-      processEventPoint(point, rotationContext, rotationAngle3d),
-    );
-
-    if (!(segmentDuration > 0) || !(copyCycle > 0) || copyIndex !== activeCopyIndex) {
-      if (!(segmentDuration > 0)) {
-        const staticPoint = points[0];
-        drawRotatedMarker(staticPoint, rotationContext, rotationAngle3d, {
-          radius: baseMarkerRadius * 1.2,
-          baseOpacity: 0.28,
-        });
-      }
-      return;
-    }
-
-    const cycle = segmentDuration * Math.max(1, view2d.segmentCount || points.length);
-    if (!(cycle > 0)) {
-      return;
-    }
-
-    const local = copyElapsed % cycle;
-    const index = Math.floor(local / segmentDuration);
-    const t = (local - index * segmentDuration) / segmentDuration;
-    const current = points[index % points.length];
-    const next = points[(index + 1) % points.length];
-    const progressPoint = lerpPoint(current, next, t);
-
-    drawRotatedMarker(progressPoint, rotationContext, rotationAngle3d, {
-      radius: baseMarkerRadius * 1.25,
-      baseOpacity: 0.32,
-    });
   };
 
-  const drawCircleCopy = (rotation, copyIndex) => {
-    const direction = { x: Math.cos(rotation), y: Math.sin(rotation) };
-    const center = {
-      x: baseCenter.x - direction.x * shapeRadius,
-      y: baseCenter.y - direction.y * shapeRadius,
-    };
-    const radius = shapeRadius;
-    const samples = 64;
-    const rotationAngle3d = axisRotationStep * copyIndex;
-    const rotationContext = createAxisRotationContext(
-      stationarySoundCircle,
-      center,
-    );
-
-    ctx.save();
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 3;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    for (let i = 0; i <= samples; i += 1) {
-      const angle = rotation + (i / samples) * Math.PI * 2;
-      const point = {
-        x: center.x + radius * Math.cos(angle),
-        y: center.y + radius * Math.sin(angle),
+  let movingIsoPoint = null;
+  if (copyCycle > 0 && copyInfos[activeCopyIndex]) {
+    const info = copyInfos[activeCopyIndex];
+    const totalLength = info.pathTotalLength;
+    const segmentDuration = view2d.segmentDuration || 0;
+    if (view2d.bounce && info.lineSegment && segmentDuration > 0) {
+      const bounceCycle = segmentDuration * 2;
+      const local = bounceCycle > 0 ? copyElapsed % bounceCycle : 0;
+      const phase = bounceCycle > 0 ? Math.floor(local / segmentDuration) : 0;
+      const t = segmentDuration > 0 ? (local - phase * segmentDuration) / segmentDuration : 0;
+      const fromPoint = phase % 2 === 0 ? info.lineSegment.start : info.lineSegment.end;
+      const toPoint = phase % 2 === 0 ? info.lineSegment.end : info.lineSegment.start;
+      movingIsoPoint = {
+        x: fromPoint.x + (toPoint.x - fromPoint.x) * t,
+        y: fromPoint.y + (toPoint.y - fromPoint.y) * t,
       };
-      const isoPoint = projectRotatedPoint(
-        point,
-        rotationContext,
-        rotationAngle3d,
-      );
-      if (i === 0) {
-        ctx.moveTo(isoPoint.x, isoPoint.y);
-      } else {
-        ctx.lineTo(isoPoint.x, isoPoint.y);
+    } else if (totalLength > 0) {
+      const progress = copyElapsed / copyCycle;
+      let distance = Math.max(0, Math.min(1, progress)) * totalLength;
+      for (let i = 0; i < info.pathSegmentLengths.length; i += 1) {
+        const length = info.pathSegmentLengths[i];
+        const from = info.pathIsoPoints[i];
+        const to = info.pathIsoPoints[i + 1];
+        if (!(length > 0)) {
+          continue;
+        }
+        if (distance <= length) {
+          const tSegment = distance / length;
+          movingIsoPoint = {
+            x: from.x + (to.x - from.x) * tSegment,
+            y: from.y + (to.y - from.y) * tSegment,
+          };
+          break;
+        }
+        distance -= length;
+      }
+      if (!movingIsoPoint) {
+        const last = info.pathIsoPoints[info.pathIsoPoints.length - 1];
+        movingIsoPoint = last || info.pathIsoPoints[0];
       }
     }
-    ctx.stroke();
-    ctx.restore();
+  }
 
-    ensureCenterMarker();
+  if (!movingIsoPoint && copyInfos[0]) {
+    movingIsoPoint = copyInfos[0].pathIsoPoints[0];
+  }
 
-    if (!(segmentDuration > 0) || !(copyCycle > 0) || copyIndex !== activeCopyIndex) {
-      if (!(segmentDuration > 0)) {
-        const staticPoint = {
-          x: center.x + radius * Math.cos(rotation),
-          y: center.y + radius * Math.sin(rotation),
-        };
-        drawRotatedMarker(staticPoint, rotationContext, rotationAngle3d, {
-          radius: baseMarkerRadius * 1.2,
-          baseOpacity: 0.28,
-        });
-      }
+  drawInfos.forEach((info) => {
+    const shouldDraw = showFullScene || info.index === activeCopyIndex;
+    if (!shouldDraw) {
       return;
     }
+    drawShape(info, { activeCopyIndex });
+  });
 
-    const cycle = segmentDuration > 0 ? segmentDuration : copyCycle;
-    if (!(cycle > 0)) {
-      return;
-    }
-
-    const local = copyElapsed % cycle;
-    const progress = cycle > 0 ? local / cycle : 0;
-    const angle = rotation + 2 * Math.PI * progress;
-    const progressPoint = {
-      x: center.x + radius * Math.cos(angle),
-      y: center.y + radius * Math.sin(angle),
-    };
-
-    drawRotatedMarker(progressPoint, rotationContext, rotationAngle3d, {
-      radius: baseMarkerRadius * 1.25,
+  if (movingIsoPoint) {
+    drawMarker(movingIsoPoint, {
+      radius: baseMarkerRadius * 1.1,
       baseOpacity: 0.32,
     });
-  };
-
-  for (let copyIndex = 0; copyIndex < copyCount; copyIndex += 1) {
-    const rotation = baseOrientationAngle + angleStep * copyIndex;
-    if (view2d.shape === 'line') {
-      drawLineCopy(rotation, copyIndex);
-    } else if (view2d.shape === 'polygon') {
-      drawPolygonCopy(rotation, copyIndex);
-    } else if (view2d.shape === 'circle') {
-      drawCircleCopy(rotation, copyIndex);
-    }
   }
 
-  if (!centerMarkerDrawn) {
-    ensureCenterMarker();
-  }
+  drawMarker(soundIsoPoint, {
+    color: 'rgba(255, 255, 255, 0.85)',
+    stroke: 'rgba(255, 255, 255, 0.9)',
+    baseOpacity: 0.18,
+    radius: baseMarkerRadius * 0.75,
+  });
 }
+
+
+
 
 function drawMuteOverlay(quadrant) {
   const { offsetX, offsetY, width, height } = getOffsetsFromQuadrant(quadrant);
