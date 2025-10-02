@@ -335,23 +335,40 @@ function drawCircle(point, color) {
 
 function drawEventMarker(point, strokeColor, fillColor, radius, options = {}) {
   const { highlight = false } = options;
+  const markerRadius = highlight ? radius * 1.2 : radius;
   if (highlight) {
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.beginPath();
-    ctx.arc(point.x, point.y, radius * 1.6, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, markerRadius * 1.9, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.lineWidth = Math.max(1.5, markerRadius * 0.4);
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, markerRadius * 1.35, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
   ctx.save();
   ctx.fillStyle = fillColor;
   ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = Math.max(1, radius * 0.5);
+  ctx.lineWidth = Math.max(1.5, markerRadius * 0.45);
   ctx.beginPath();
-  ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+  ctx.arc(point.x, point.y, markerRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+  if (highlight) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, markerRadius * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function getLineSoundPoints(start, end, config, soundMarkers) {
@@ -403,6 +420,37 @@ function getSegmentColor(name) {
   }
 }
 
+function lightenColor(hex, amount = 0.25) {
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) {
+    return hex;
+  }
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  if ([r, g, b].some((component) => Number.isNaN(component))) {
+    return hex;
+  }
+  const mix = (component) => {
+    const value = Math.round(component + (255 - component) * amount);
+    return Math.max(0, Math.min(255, value));
+  };
+  const toHex = (component) => component.toString(16).padStart(2, '0');
+  const lightened = `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
+  return lightened;
+}
+
+function getFirstSoundMarkerColor(name, baseColor) {
+  switch (name) {
+    case 'gati':
+      return lightenColor(baseColor, 0.4);
+    case 'nadai':
+      return lightenColor(baseColor, 0.38);
+    default:
+      return baseColor;
+  }
+}
+
 function getStrokeColor(name) {
   switch (name) {
     case 'laya':
@@ -423,6 +471,7 @@ function drawQuadrantShape(name, config, elapsed) {
   ctx.lineWidth = 3;
   const strokeColor = ctx.strokeStyle;
   const color = getSegmentColor(name);
+  const firstEventColor = getFirstSoundMarkerColor(name, color);
   const eventRadius = ctx.lineWidth * 2;
   if (config.shape === 'line') {
     const [start, end] = getLinePoints(config.orientation);
@@ -430,7 +479,8 @@ function drawQuadrantShape(name, config, elapsed) {
 
     const eventPoints = getLineSoundPoints(start, end, config, config.soundMarkers);
     eventPoints.forEach((pt, index) => {
-      drawEventMarker(pt, strokeColor, color, eventRadius, {
+      const fillColor = config.highlightFirstEvent && index === 0 ? firstEventColor : color;
+      drawEventMarker(pt, strokeColor, fillColor, eventRadius, {
         highlight: !!config.highlightFirstEvent && index === 0,
       });
     });
@@ -468,7 +518,8 @@ function drawQuadrantShape(name, config, elapsed) {
     drawPolygon(points);
     const eventPoints = getPolygonSoundPoints(points, config.soundMarkers);
     eventPoints.forEach((pt, index) => {
-      drawEventMarker(pt, strokeColor, color, eventRadius, {
+      const fillColor = config.highlightFirstEvent && index === 0 ? firstEventColor : color;
+      drawEventMarker(pt, strokeColor, fillColor, eventRadius, {
         highlight: !!config.highlightFirstEvent && index === 0,
       });
     });
@@ -487,7 +538,8 @@ function drawQuadrantShape(name, config, elapsed) {
     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    drawEventMarker(top, strokeColor, color, eventRadius, {
+    const fillColor = config.highlightFirstEvent ? firstEventColor : color;
+    drawEventMarker(top, strokeColor, fillColor, eventRadius, {
       highlight: !!config.highlightFirstEvent,
     });
 
