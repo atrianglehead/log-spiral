@@ -102,6 +102,13 @@
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .mute-label-short {
+      display: none;
     }
     .mute.active {
       background: var(--control-color);
@@ -280,39 +287,52 @@
       }
       .control-strip {
         grid-template-columns: 1fr;
-        padding: 10px 12px;
+        padding: 8px 10px;
         border-radius: 10px;
+        gap: 8px;
       }
       .control-strip::after { display: none; }
       .control {
-        padding: 10px 12px;
-        gap: 8px;
+        padding: 8px 10px;
+        gap: 6px;
+        min-height: 0;
       }
       .control-strip > .control:first-child,
       .control-strip > .control:last-child {
-        padding-left: 12px;
-        padding-right: 12px;
+        padding-left: 10px;
+        padding-right: 10px;
       }
       .control label {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         letter-spacing: 0.08em;
-        min-width: 44px;
+        min-width: 38px;
       }
       .mute {
-        font-size: 0.68rem;
-        padding: 5px 10px;
+        font-size: 0.6rem;
+        padding: 4px 8px;
+        min-width: 28px;
+      }
+      .mute-label-full {
+        display: none;
+      }
+      .mute-label-short {
+        display: inline;
       }
       .value {
-        font-size: 0.78rem;
-        min-width: 44px;
+        font-size: 0.72rem;
+        min-width: 40px;
       }
       .control + .control {
         border-top: 1px solid var(--line);
-        margin-top: 12px;
-        padding-top: 16px;
+        margin-top: 8px;
+        padding-top: 12px;
+      }
+      .control input[type="range"] {
+        flex: 0 1 120px;
+        min-width: 0;
       }
       input[type="range"] {
-        min-height: 24px;
+        min-height: 20px;
       }
       #play-toggle { width: 56px; height: 56px; font-size: 1.2rem; }
       .canvas-wrapper {
@@ -322,7 +342,8 @@
       .quadrant-tabs {
         top: auto;
         left: auto;
-        padding: 3px;
+        padding: 2px;
+        gap: 2px;
       }
       .quadrant-tabs.top-left {
         top: 16px;
@@ -333,8 +354,9 @@
         left: calc(50% + 12px);
       }
       .quadrant-tabs button {
-        font-size: 0.68rem;
-        padding: 5px 10px;
+        font-size: 0.6rem;
+        padding: 4px 8px;
+        min-width: 34px;
       }
       .quadrant-option.top-right {
         top: 68px;
@@ -357,13 +379,13 @@
     <section class="control-strip" aria-label="Gati and Jati controls">
       <div class="control" data-kind="gati">
         <label for="gati">Gati</label>
-        <button class="mute" data-target="gati" aria-pressed="false">Mute</button>
+        <button class="mute" data-target="gati" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="gati" type="range" min="1" max="13" step="1" value="4" />
         <span class="value" data-for="gati">4</span>
       </div>
       <div class="control" data-kind="jati">
         <label for="jati">Jati</label>
-        <button class="mute" data-target="jati" aria-pressed="false">Mute</button>
+        <button class="mute" data-target="jati" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="jati" type="range" min="1" max="13" step="1" value="3" />
         <span class="value" data-for="jati">3</span>
       </div>
@@ -395,13 +417,13 @@
     <section class="control-strip" aria-label="Laya and Nadai controls">
       <div class="control" data-kind="laya">
         <label for="laya">Laya</label>
-        <button class="mute" data-target="laya" aria-pressed="false">Mute</button>
+        <button class="mute" data-target="laya" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="laya" type="range" min="30" max="120" step="1" value="40" />
         <span class="value" data-for="laya">40 bpm</span>
       </div>
       <div class="control" data-kind="nadai">
         <label for="nadai">Nadai</label>
-        <button class="mute" data-target="nadai" aria-pressed="false">Mute</button>
+        <button class="mute" data-target="nadai" aria-pressed="false" aria-label="Mute"><span class="mute-label-full" aria-hidden="true">Mute</span><span class="mute-label-short" aria-hidden="true">M</span></button>
         <input id="nadai" type="range" min="1" max="13" step="1" value="1" />
         <span class="value" data-for="nadai">1</span>
       </div>
