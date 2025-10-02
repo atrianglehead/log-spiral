@@ -338,17 +338,17 @@ function drawEventMarker(point, strokeColor, fillColor, radius, options = {}) {
   const markerRadius = highlight ? radius * 1.2 : radius;
   if (highlight) {
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.beginPath();
-    ctx.arc(point.x, point.y, markerRadius * 2.1, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, markerRadius * 1.9, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-    ctx.lineWidth = Math.max(2, markerRadius * 0.6);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.lineWidth = Math.max(1.5, markerRadius * 0.4);
     ctx.beginPath();
-    ctx.arc(point.x, point.y, markerRadius * 1.45, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, markerRadius * 1.35, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -363,9 +363,9 @@ function drawEventMarker(point, strokeColor, fillColor, radius, options = {}) {
   ctx.restore();
   if (highlight) {
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
     ctx.beginPath();
-    ctx.arc(point.x, point.y, markerRadius * 0.45, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, markerRadius * 0.38, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -443,9 +443,9 @@ function lightenColor(hex, amount = 0.25) {
 function getFirstSoundMarkerColor(name, baseColor) {
   switch (name) {
     case 'gati':
-      return lightenColor(baseColor, 0.6);
+      return lightenColor(baseColor, 0.4);
     case 'nadai':
-      return lightenColor(baseColor, 0.55);
+      return lightenColor(baseColor, 0.38);
     default:
       return baseColor;
   }
