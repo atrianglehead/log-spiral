@@ -2,25 +2,20 @@ import {
   createAxisRotationContext,
   rotatePointAroundAxisOnPlane,
 } from './jati3dGeometry.js';
+import {
+  initModeTabs,
+  initMuteButtons,
+  initSliders,
+  updateValueLabels,
+} from './uiControls.js';
 
 const canvas = document.getElementById('layakine-canvas');
 const ctx = canvas.getContext('2d');
 const playToggle = document.getElementById('play-toggle');
-const sliders = {
-  laya: document.getElementById('laya'),
-  gati: document.getElementById('gati'),
-  jati: document.getElementById('jati'),
-  nadai: document.getElementById('nadai'),
-};
-const valueLabels = {
-  laya: document.querySelector('[data-for="laya"]'),
-  gati: document.querySelector('[data-for="gati"]'),
-  jati: document.querySelector('[data-for="jati"]'),
-  nadai: document.querySelector('[data-for="nadai"]'),
-};
-const muteButtons = Array.from(document.querySelectorAll('.mute'));
-const modeButtons = Array.from(document.querySelectorAll('.mode-tab'));
-const quadrantTabs = Array.from(document.querySelectorAll('.quadrant-tabs'));
+let quadrantTabs = [];
+let sliders = {};
+let valueLabels = {};
+let muteButtons = [];
 
 const quadrantModes = {
   laya: '1d',
@@ -28,31 +23,6 @@ const quadrantModes = {
   jati: '3d',
   nadai: '3d',
 };
-
-function setQuadrantMode(quadrant, mode) {
-  if (!(quadrant in quadrantModes)) {
-    return;
-  }
-  quadrantModes[quadrant] = mode;
-  modeButtons.forEach((button) => {
-    if (button.dataset.quadrant === quadrant) {
-      button.classList.toggle('active', button.dataset.mode === mode);
-    }
-  });
-}
-
-modeButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    const { quadrant, mode } = button.dataset;
-    if (quadrant && mode) {
-      setQuadrantMode(quadrant, mode);
-    }
-  });
-});
-
-Object.keys(quadrantModes).forEach((name) => {
-  setQuadrantMode(name, quadrantModes[name]);
-});
 
 let audioCtx = null;
 let masterGain = null;
@@ -72,30 +42,6 @@ function clamp(value, min, max) {
     return min;
   }
   return Math.min(Math.max(value, min), max);
-}
-
-function formatMuteTargetLabel(target = '') {
-  if (!target) {
-    return '';
-  }
-  return target.charAt(0).toUpperCase() + target.slice(1);
-}
-
-function updateMuteButtonState(button, isMuted) {
-  const target = button.dataset.target;
-  button.classList.toggle('active', isMuted);
-  button.setAttribute('aria-pressed', isMuted ? 'true' : 'false');
-  const friendlyTarget = formatMuteTargetLabel(target);
-  if (friendlyTarget) {
-    const action = isMuted ? 'Unmute' : 'Mute';
-    button.setAttribute('aria-label', `${action} ${friendlyTarget}`);
-  }
-  const label = button.querySelector('.mute-label');
-  if (label) {
-    label.textContent = isMuted ? 'Muted' : 'Mute';
-  } else {
-    button.textContent = isMuted ? 'Muted' : 'Mute';
-  }
 }
 
 const voices = {
@@ -221,13 +167,6 @@ function getElapsed() {
 
 function formatLayaValue(value) {
   return `${value} bpm`;
-}
-
-function updateValueLabels() {
-  valueLabels.laya.textContent = formatLayaValue(sliders.laya.value);
-  valueLabels.gati.textContent = sliders.gati.value;
-  valueLabels.jati.textContent = sliders.jati.value;
-  valueLabels.nadai.textContent = sliders.nadai.value;
 }
 
 function playClick(kind, time) {
@@ -2622,39 +2561,36 @@ playToggle.addEventListener('click', () => {
   togglePlay();
 });
 
-Object.entries(sliders).forEach(([name, input]) => {
-  input.addEventListener('input', () => {
-    if (name === 'laya') {
-      valueLabels.laya.textContent = formatLayaValue(input.value);
-    } else {
-      valueLabels[name].textContent = input.value;
-    }
-    if (name === 'laya') {
-      pausedElapsed = getElapsed();
-      if (isPlaying) {
-        startTime = audioCtx.currentTime - pausedElapsed;
-      }
-    }
-    resetSchedulers();
-  });
-});
-
-muteButtons.forEach((button) => {
-  const target = button.dataset.target;
-  if (target && target in muteState) {
-    updateMuteButtonState(button, muteState[target]);
+function handleModeChange(quadrant, mode) {
+  if (!(quadrant in quadrantModes)) {
+    return;
   }
-  button.addEventListener('click', () => {
-    const clickedTarget = button.dataset.target;
-    if (!clickedTarget || !(clickedTarget in muteState)) {
-      return;
-    }
-    muteState[clickedTarget] = !muteState[clickedTarget];
-    updateMuteButtonState(button, muteState[clickedTarget]);
-    updateQuadrantTabSizing(canvas.getBoundingClientRect());
-  });
-});
+  quadrantModes[quadrant] = mode;
+}
 
-updateValueLabels();
+function handleMuteToggle() {
+  updateQuadrantTabSizing(canvas.getBoundingClientRect());
+}
+
+function handleSliderInput(name) {
+  if (name === 'laya') {
+    pausedElapsed = getElapsed();
+    if (isPlaying && audioCtx) {
+      startTime = audioCtx.currentTime - pausedElapsed;
+    }
+  }
+  resetSchedulers();
+}
+
+({ quadrantTabs } = initModeTabs(document, quadrantModes, { onModeChange: handleModeChange }));
+({ sliders, valueLabels } = initSliders(document, {
+  formatters: { laya: formatLayaValue },
+  onInput: handleSliderInput,
+}));
+({ buttons: muteButtons } = initMuteButtons(document, muteState, {
+  onToggle: handleMuteToggle,
+}));
+
+updateValueLabels(sliders, valueLabels, { laya: formatLayaValue });
 resetSchedulers();
 requestAnimationFrame(render);
