@@ -20,30 +20,15 @@ export function getOffsetsFromQuadrant(canvas, quadrant) {
   return { offsetX, offsetY, width: halfW, height: halfH };
 }
 
-const QUADRANT_VERTICAL_SHIFT_RATIO = 0.12;
-const QUADRANT_CENTER_MIN_RATIO = 0.35;
-const QUADRANT_CENTER_MAX_RATIO = 0.88;
-
 export function getQuadrantMetrics(canvas, quadrant) {
   const offsets = getOffsetsFromQuadrant(canvas, quadrant);
   const { offsetX, offsetY, width, height } = offsets;
   const baseCenterX = offsetX + width / 2;
   const baseCenterY = offsetY + height / 2;
-  if (!(width > 0) || !(height > 0)) {
-    return {
-      ...offsets,
-      center: { x: baseCenterX, y: baseCenterY },
-      verticalShift: 0,
-    };
-  }
-  const desiredCenterY = baseCenterY + height * QUADRANT_VERTICAL_SHIFT_RATIO;
-  const minCenterY = offsetY + height * QUADRANT_CENTER_MIN_RATIO;
-  const maxCenterY = offsetY + height * QUADRANT_CENTER_MAX_RATIO;
-  const centerY = clamp(desiredCenterY, minCenterY, maxCenterY);
   return {
     ...offsets,
-    center: { x: baseCenterX, y: centerY },
-    verticalShift: centerY - baseCenterY,
+    center: { x: baseCenterX, y: baseCenterY },
+    verticalShift: 0,
   };
 }
 
