@@ -250,6 +250,13 @@ function render() {
   requestAnimationFrame(render);
 }
 
+function updatePlayToggle() {
+  const isPlaying = Boolean(audioEngine && audioEngine.isPlaying());
+  playToggle.dataset.state = isPlaying ? 'pause' : 'play';
+  playToggle.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+  playToggle.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
+}
+
 function togglePlay() {
   if (!audioEngine) {
     return;
@@ -259,7 +266,7 @@ function togglePlay() {
   } else {
     audioEngine.start();
   }
-  playToggle.textContent = audioEngine.isPlaying() ? '⏸' : '▶';
+  updatePlayToggle();
 }
 
 playToggle.addEventListener('click', () => {
@@ -321,4 +328,5 @@ audioEngine.setTempo(initialTempo);
 audioEngine.setCounts(initialCounts);
 
 updateValueLabels(sliders, valueLabels, { laya: formatLayaValue });
+updatePlayToggle();
 requestAnimationFrame(render);
