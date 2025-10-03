@@ -624,7 +624,7 @@ function drawEventMarker(point, strokeColor, fillColor, radius, options = {}) {
     ctx.restore();
 
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.325)';
     ctx.lineWidth = Math.max(1.5, markerRadius * 0.4);
     ctx.beginPath();
     ctx.arc(point.x, point.y, markerRadius * 1.35, 0, Math.PI * 2);
@@ -1996,7 +1996,7 @@ function drawJatiQuadrant3dBeta(config, elapsed) {
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
     const highlightFirstCopy = info.index === 0;
-    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.46)';
+    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.23)';
     const highlightLineWidth = Math.max(0.7, canvas.width * 0.001);
     if (isLineShape && info.lineSegment) {
       ctx.save();
@@ -2467,7 +2467,7 @@ function drawNadaiQuadrant3d(config, elapsed) {
     const baseAlpha = showFullScene ? frontShade : frontShade + 0.12;
     const strokeAlpha = isActive ? 0.9 : info.facing ? 0.65 : 0.4;
     const highlightFirstCopy = info.index === 0;
-    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.46)';
+    const highlightStrokeStyle = 'rgba(255, 255, 255, 0.23)';
     const highlightLineWidth = Math.max(0.7, canvas.width * 0.001);
     if (isLineShape && info.lineSegment) {
       ctx.save();
