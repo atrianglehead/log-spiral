@@ -245,11 +245,13 @@
     }
     .quadrant-tabs.top-right {
       top: 0;
-      left: 50%;
+      right: 0;
+      left: auto;
+      justify-content: flex-end;
     }
     .quadrant-option.top-right {
       top: calc(var(--quadrant-tab-height, 40px) + 32px);
-      right: 28px;
+      right: 0;
       left: auto;
     }
     .quadrant-tabs.bottom-left {
@@ -258,7 +260,9 @@
     }
     .quadrant-tabs.bottom-right {
       top: 50%;
-      left: 50%;
+      right: 0;
+      left: auto;
+      justify-content: flex-end;
     }
     canvas {
       width: 100%;
@@ -357,7 +361,7 @@
       }
       .quadrant-option.top-right {
         top: calc(var(--quadrant-tab-height, 40px) + 24px);
-        right: 16px;
+        right: 0;
         left: auto;
       }
     }
