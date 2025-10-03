@@ -283,12 +283,45 @@
       background: rgba(20, 20, 20, 0.85);
       color: #f7f7f7;
       font-size: 1.4rem;
+      padding: 0;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: background 0.2s ease;
       z-index: 4;
+    }
+    #play-toggle .play-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+      position: relative;
+      background: currentColor;
+      clip-path: polygon(24% 16%, 24% 84%, 78% 50%);
+      transition: transform 0.2s ease, clip-path 0.2s ease;
+    }
+    #play-toggle[data-state='pause'] .play-toggle-icon {
+      background: none;
+      clip-path: none;
+    }
+    #play-toggle[data-state='pause'] .play-toggle-icon::before,
+    #play-toggle[data-state='pause'] .play-toggle-icon::after {
+      content: '';
+      position: absolute;
+      top: 16%;
+      bottom: 16%;
+      width: 26%;
+      border-radius: 1.5px;
+      background: currentColor;
+    }
+    #play-toggle[data-state='pause'] .play-toggle-icon::before {
+      left: 18%;
+    }
+    #play-toggle[data-state='pause'] .play-toggle-icon::after {
+      right: 18%;
+    }
+    #play-toggle:active .play-toggle-icon {
+      transform: scale(0.9);
     }
     #play-toggle:hover {
       background: rgba(40, 40, 40, 0.85);
@@ -404,7 +437,9 @@
         <button class="mode-tab" data-quadrant="nadai" data-mode="3d" type="button">3D</button>
       </div>
       <canvas id="pralaya-canvas" width="800" height="800" aria-hidden="true"></canvas>
-      <button id="play-toggle" type="button" aria-label="Play">▶</button>
+      <button id="play-toggle" type="button" aria-label="Play" data-state="play">
+        <span class="play-toggle-icon" aria-hidden="true"></span>
+      </button>
     </div>
     <section class="control-strip" aria-label="Laya and Nadai controls">
       <div class="control" data-kind="laya">
