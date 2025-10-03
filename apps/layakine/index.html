@@ -168,40 +168,19 @@
       padding: 16px;
     }
     .quadrant-tabs {
-      --quadrant-tab-max-width: none;
-      --quadrant-tab-max-height: none;
-      --quadrant-tab-translate-x: 0px;
-      --quadrant-tab-translate-y: 0px;
-      --quadrant-tab-scale: 1;
-      --quadrant-tab-gap: clamp(2px, 0.8vw, 10px);
-      --quadrant-tab-padding: clamp(3px, 0.6vw, 8px);
       position: absolute;
-      display: inline-flex;
-      flex-wrap: wrap;
-      gap: var(--quadrant-tab-gap);
-      justify-content: center;
-      align-content: center;
-      align-items: center;
+      display: flex;
+      gap: 4px;
+      align-items: stretch;
+      justify-content: flex-start;
       background: rgba(8, 8, 8, 0.85);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 999px;
-      padding: var(--quadrant-tab-padding);
+      border-radius: 10px;
+      padding: 4px;
       z-index: 3;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
       backdrop-filter: blur(6px);
-      max-width: var(--quadrant-tab-max-width, none);
-      max-height: var(--quadrant-tab-max-height, none);
-      transform: translate(var(--quadrant-tab-translate-x), var(--quadrant-tab-translate-y))
-        scale(var(--quadrant-tab-scale));
-      will-change: transform;
-    }
-    .quadrant-tabs[data-quadrant='gati'],
-    .quadrant-tabs[data-quadrant='laya'] {
-      transform-origin: top left;
-    }
-    .quadrant-tabs[data-quadrant='jati'],
-    .quadrant-tabs[data-quadrant='nadai'] {
-      transform-origin: top right;
+      height: var(--quadrant-tab-height, 40px);
     }
     .quadrant-option {
       position: absolute;
@@ -241,11 +220,16 @@
       font-size: clamp(0.62rem, 0.54rem + 0.28vw, 0.95rem);
       font-weight: 600;
       letter-spacing: 0.08em;
-      padding: clamp(4px, 0.4vw + 2px, 10px) clamp(8px, 0.8vw + 6px, 18px);
-      border-radius: 999px;
+      padding: 0;
+      border-radius: 6px;
       cursor: pointer;
       transition: color 0.2s ease, background 0.2s ease;
-      min-width: clamp(40px, 6vw, 80px);
+      flex: 0 0 auto;
+      width: var(--quadrant-tab-width, 80px);
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .quadrant-tabs button.active {
       background: rgba(244, 244, 244, 0.9);
@@ -256,27 +240,25 @@
       outline-offset: 2px;
     }
     .quadrant-tabs.top-left {
-      top: 24px;
-      left: 24px;
+      top: 0;
+      left: 0;
     }
     .quadrant-tabs.top-right {
-      top: 24px;
-      right: 24px;
-      left: auto;
+      top: 0;
+      left: 50%;
     }
     .quadrant-option.top-right {
-      top: 80px;
+      top: calc(var(--quadrant-tab-height, 40px) + 32px);
       right: 28px;
       left: auto;
     }
     .quadrant-tabs.bottom-left {
-      top: calc(50% + 24px);
-      left: 24px;
+      top: 50%;
+      left: 0;
     }
     .quadrant-tabs.bottom-right {
-      top: calc(50% + 24px);
-      right: 24px;
-      left: auto;
+      top: 50%;
+      left: 50%;
     }
     canvas {
       width: 100%;
@@ -366,37 +348,16 @@
         min-height: 50vh;
       }
       .quadrant-tabs {
-        top: auto;
-        left: auto;
-        --quadrant-tab-gap: clamp(2px, 1.4vw, 6px);
-        --quadrant-tab-padding: clamp(2px, 0.9vw, 6px);
-      }
-      .quadrant-tabs.top-left {
-        top: 16px;
-        left: 16px;
-      }
-      .quadrant-tabs.top-right {
-        top: 16px;
-        right: 12px;
-        left: auto;
+        gap: 3px;
+        padding: 3px;
       }
       .quadrant-tabs button {
         font-size: clamp(0.52rem, 0.48rem + 0.36vw, 0.78rem);
-        padding: clamp(3px, 0.36vw + 2px, 6px) clamp(6px, 0.9vw + 3px, 12px);
-        min-width: clamp(32px, 10vw, 60px);
+        border-radius: 4px;
       }
       .quadrant-option.top-right {
-        top: 68px;
+        top: calc(var(--quadrant-tab-height, 40px) + 24px);
         right: 16px;
-        left: auto;
-      }
-      .quadrant-tabs.bottom-left {
-        top: calc(50% + 12px);
-        left: 16px;
-      }
-      .quadrant-tabs.bottom-right {
-        top: calc(50% + 12px);
-        right: 12px;
         left: auto;
       }
     }
