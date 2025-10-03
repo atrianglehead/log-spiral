@@ -8,6 +8,7 @@ import {
   initSliders,
   updateValueLabels,
 } from './uiControls.js';
+import { createAudioEngine } from './audioEngine.js';
 
 const canvas = document.getElementById('layakine-canvas');
 const ctx = canvas.getContext('2d');
@@ -24,12 +25,6 @@ const quadrantModes = {
   nadai: '3d',
 };
 
-let audioCtx = null;
-let masterGain = null;
-let isPlaying = false;
-let startTime = 0;
-let pausedElapsed = 0;
-
 const muteState = {
   laya: false,
   gati: false,
@@ -37,47 +32,16 @@ const muteState = {
   nadai: false,
 };
 
+let audioEngine = null;
+
+const getElapsed = () => (audioEngine ? audioEngine.getElapsed() : 0);
+
 function clamp(value, min, max) {
   if (!Number.isFinite(value)) {
     return min;
   }
   return Math.min(Math.max(value, min), max);
 }
-
-const voices = {
-  laya: {
-    wave: 'sine',
-    frequency: 220,
-    nextIndex: 0,
-    segmentDuration: 1,
-    cycleSegments: 1,
-    playEverySegment: true,
-  },
-  gati: {
-    wave: 'triangle',
-    frequency: 320,
-    nextIndex: 0,
-    segmentDuration: 1,
-    cycleSegments: 1,
-    playEverySegment: true,
-  },
-  jati: {
-    wave: 'square',
-    frequency: 420,
-    nextIndex: 0,
-    segmentDuration: 1,
-    cycleSegments: 1,
-    playEverySegment: false,
-  },
-  nadai: {
-    wave: 'sawtooth',
-    frequency: 540,
-    nextIndex: 0,
-    segmentDuration: 1,
-    cycleSegments: 1,
-    playEverySegment: false,
-  },
-};
 
 function lightenColor(hex, amount = 0.25) {
   const normalized = hex.replace('#', '');
@@ -147,137 +111,8 @@ function getStrokeColor(name) {
   return stroke ?? defaultVoicePalette.stroke;
 }
 
-function ensureAudio() {
-  if (!audioCtx) {
-    audioCtx = new AudioContext();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.6;
-    masterGain.connect(audioCtx.destination);
-  }
-  return audioCtx;
-}
-
-function getElapsed() {
-  if (!isPlaying) {
-    return pausedElapsed;
-  }
-  const ctx = ensureAudio();
-  return ctx.currentTime - startTime;
-}
-
 function formatLayaValue(value) {
   return `${value} bpm`;
-}
-
-function playClick(kind, time) {
-  if (!audioCtx) {
-    return;
-  }
-  if (muteState[kind]) {
-    return;
-  }
-  const voice = voices[kind];
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = voice.wave;
-  osc.frequency.setValueAtTime(voice.frequency, time);
-  gain.gain.setValueAtTime(0, time);
-  gain.gain.linearRampToValueAtTime(0.3, time + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
-  osc.connect(gain).connect(masterGain);
-  osc.start(time);
-  osc.stop(time + 0.2);
-}
-
-function recalcVoice(name, segmentDuration, options = {}) {
-  const { cycleSegments = 1, playEverySegment = true } = options;
-  const voice = voices[name];
-  voice.segmentDuration = segmentDuration;
-  voice.cycleSegments = Math.max(1, cycleSegments);
-  voice.playEverySegment = playEverySegment;
-  if (!audioCtx) {
-    voice.nextIndex = 0;
-    voice.nextTime = 0;
-    return;
-  }
-  const now = audioCtx.currentTime;
-  const elapsed = getElapsed();
-  if (segmentDuration <= 0) {
-    voice.nextIndex = 0;
-    voice.nextTime = now + 1;
-    return;
-  }
-  const baseStart = startTime;
-  let nextIndex = Math.floor(elapsed / segmentDuration);
-  let nextTime = baseStart + nextIndex * segmentDuration;
-  if (elapsed === 0) {
-    nextIndex = 0;
-    nextTime = baseStart;
-  }
-  while (nextTime < now) {
-    nextIndex += 1;
-    nextTime = baseStart + nextIndex * segmentDuration;
-  }
-  voice.nextIndex = nextIndex;
-  voice.nextTime = nextTime;
-}
-
-function resetSchedulers() {
-  const layaPeriod = 60 / Number(sliders.laya.value);
-  const gatiCount = Number(sliders.gati.value);
-  const jatiCount = Number(sliders.jati.value);
-  const nadaiCount = Number(sliders.nadai.value);
-
-  recalcVoice('laya', layaPeriod, { cycleSegments: 1, playEverySegment: true });
-
-  const gatiSegmentCount = gatiCount === 1 ? 1 : gatiCount;
-  const gatiSegmentDuration = layaPeriod / gatiSegmentCount;
-  recalcVoice('gati', gatiSegmentDuration, {
-    cycleSegments: gatiSegmentCount,
-    playEverySegment: true,
-  });
-
-  const gatiSideDuration = layaPeriod / Math.max(1, gatiCount);
-  const jatiSegments = jatiCount === 1 ? 1 : jatiCount;
-  recalcVoice('jati', gatiSideDuration, {
-    cycleSegments: jatiSegments,
-    playEverySegment: jatiSegments <= 1,
-  });
-
-  const jatiCycleDuration = gatiSideDuration * jatiSegments;
-  const nadaiSegments = Math.max(1, nadaiCount);
-  const nadaiSegmentDuration =
-    nadaiSegments > 0 && jatiCycleDuration > 0 ? jatiCycleDuration / nadaiSegments : 0;
-  recalcVoice('nadai', nadaiSegmentDuration, {
-    cycleSegments: nadaiSegments,
-    playEverySegment: true,
-  });
-}
-
-function scheduleAudio() {
-  if (!isPlaying || !audioCtx) {
-    return;
-  }
-  const lookAhead = 0.2;
-  const now = audioCtx.currentTime;
-  Object.keys(voices).forEach((name) => {
-    const voice = voices[name];
-    if (typeof voice.nextTime !== 'number') {
-      voice.nextTime = startTime;
-    }
-    while (voice.segmentDuration > 0 && voice.nextTime <= now + lookAhead) {
-      const cycleSegments = voice.cycleSegments || 1;
-      if (
-        voice.playEverySegment ||
-        cycleSegments <= 1 ||
-        voice.nextIndex % cycleSegments === 0
-      ) {
-        playClick(name, voice.nextTime);
-      }
-      voice.nextIndex += 1;
-      voice.nextTime = startTime + voice.nextIndex * voice.segmentDuration;
-    }
-  });
 }
 
 const QUADRANT_ALIGNMENT = {
@@ -2530,31 +2365,19 @@ function render() {
   if (muteState.nadai) {
     drawMuteOverlay('bottom-right');
   }
-
-  scheduleAudio();
   requestAnimationFrame(render);
 }
 
 function togglePlay() {
-  if (!audioCtx) {
-    ensureAudio();
-  }
-  if (!audioCtx) {
+  if (!audioEngine) {
     return;
   }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-  if (isPlaying) {
-    pausedElapsed = getElapsed();
-    isPlaying = false;
-    playToggle.textContent = '▶';
+  if (audioEngine.isPlaying()) {
+    audioEngine.stop();
   } else {
-    startTime = audioCtx.currentTime - pausedElapsed;
-    isPlaying = true;
-    playToggle.textContent = '⏸';
+    audioEngine.start();
   }
-  resetSchedulers();
+  playToggle.textContent = audioEngine.isPlaying() ? '⏸' : '▶';
 }
 
 playToggle.addEventListener('click', () => {
@@ -2568,18 +2391,26 @@ function handleModeChange(quadrant, mode) {
   quadrantModes[quadrant] = mode;
 }
 
-function handleMuteToggle() {
+function handleMuteToggle(target, nextState) {
+  if (audioEngine && target) {
+    audioEngine.setMuteState(target, nextState);
+  }
   updateQuadrantTabSizing(canvas.getBoundingClientRect());
 }
 
 function handleSliderInput(name) {
-  if (name === 'laya') {
-    pausedElapsed = getElapsed();
-    if (isPlaying && audioCtx) {
-      startTime = audioCtx.currentTime - pausedElapsed;
-    }
+  if (!audioEngine) {
+    return;
   }
-  resetSchedulers();
+  if (name === 'laya') {
+    const tempoValue = Number(sliders.laya?.value ?? 120) || 120;
+    audioEngine.setTempo(tempoValue);
+  }
+  audioEngine.setCounts({
+    gati: Number(sliders.gati?.value ?? 1) || 1,
+    jati: Number(sliders.jati?.value ?? 1) || 1,
+    nadai: Number(sliders.nadai?.value ?? 1) || 1,
+  });
 }
 
 ({ quadrantTabs } = initModeTabs(document, quadrantModes, { onModeChange: handleModeChange }));
@@ -2591,6 +2422,21 @@ function handleSliderInput(name) {
   onToggle: handleMuteToggle,
 }));
 
+const initialTempo = Number(sliders.laya?.value ?? 120) || 120;
+const initialCounts = {
+  gati: Number(sliders.gati?.value ?? 1) || 1,
+  jati: Number(sliders.jati?.value ?? 1) || 1,
+  nadai: Number(sliders.nadai?.value ?? 1) || 1,
+};
+
+audioEngine = createAudioEngine({
+  initialTempo,
+  initialCounts,
+  initialMuteState: { ...muteState },
+});
+
+audioEngine.setTempo(initialTempo);
+audioEngine.setCounts(initialCounts);
+
 updateValueLabels(sliders, valueLabels, { laya: formatLayaValue });
-resetSchedulers();
 requestAnimationFrame(render);
