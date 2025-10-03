@@ -789,99 +789,123 @@ function getPolygonSoundPoints(points, soundMarkers) {
   return points;
 }
 
-function drawQuadrantShape(name, config, elapsed) {
-  ctx.strokeStyle = getStrokeColor(name);
-  ctx.lineWidth = 3;
-  const strokeColor = ctx.strokeStyle;
-  const color = getSegmentColor(name);
-  const firstEventColor = getFirstSoundMarkerColor(name);
-  const eventRadius = ctx.lineWidth * 2;
-  if (config.shape === 'line') {
-    const [start, end] = getLinePoints(config.orientation);
-    drawLine(start, end);
-
-    const eventPoints = getLineSoundPoints(start, end, config, config.soundMarkers);
-    eventPoints.forEach((pt, index) => {
-      const fillColor = config.highlightFirstEvent && index === 0 ? firstEventColor : color;
-      drawEventMarker(pt, strokeColor, fillColor, eventRadius, {
-        highlight: !!config.highlightFirstEvent && index === 0,
-      });
+function renderEventMarkers(eventPoints, options) {
+  const { strokeColor, color, firstEventColor, eventRadius, highlightFirstEvent } = options;
+  eventPoints.forEach((pt, index) => {
+    const isFirst = index === 0;
+    const fillColor = highlightFirstEvent && isFirst ? firstEventColor : color;
+    drawEventMarker(pt, strokeColor, fillColor, eventRadius, {
+      highlight: !!highlightFirstEvent && isFirst,
     });
+  });
+}
 
-    let point;
-    if (config.bounce) {
-      const segmentDuration = config.segmentDuration;
-      const segmentCount = 2;
-      const cycleDuration = segmentDuration * segmentCount;
-      const local = elapsed % cycleDuration;
-      const index = Math.floor(local / segmentDuration);
-      const t = (local - index * segmentDuration) / segmentDuration;
-      if (index % 2 === 0) {
-        point = lerpPoint(start, end, t);
-      } else {
-        point = lerpPoint(end, start, t);
-      }
-    } else if (config.segmentCount && config.segmentCount > 1 && config.segmentDuration > 0) {
-      const segmentDuration = config.segmentDuration;
-      const cycleDuration = segmentDuration * config.segmentCount;
-      const local = elapsed % cycleDuration;
-      const index = Math.floor(local / segmentDuration);
-      const t = (local - index * segmentDuration) / segmentDuration;
+function renderLineShape(config, elapsed, shared) {
+  const [start, end] = getLinePoints(config.orientation);
+  drawLine(start, end);
+
+  const eventPoints = getLineSoundPoints(start, end, config, config.soundMarkers);
+  renderEventMarkers(eventPoints, {
+    ...shared,
+    highlightFirstEvent: config.highlightFirstEvent,
+  });
+
+  let point;
+  if (config.bounce) {
+    const segmentDuration = config.segmentDuration;
+    const segmentCount = 2;
+    const cycleDuration = segmentDuration * segmentCount;
+    const local = elapsed % cycleDuration;
+    const index = Math.floor(local / segmentDuration);
+    const t = (local - index * segmentDuration) / segmentDuration;
+    if (index % 2 === 0) {
       point = lerpPoint(start, end, t);
     } else {
-      const local =
-        config.segmentDuration > 0
-          ? (elapsed % config.segmentDuration) / config.segmentDuration
-          : 0;
-      point = lerpPoint(start, end, local);
+      point = lerpPoint(end, start, t);
     }
-    drawCircle(point, color);
-  } else if (config.shape === 'polygon') {
-    const { points } = getPolygonPoints(config.orientation, config.sides);
-    drawPolygon(points);
-    const eventPoints = getPolygonSoundPoints(points, config.soundMarkers);
-    eventPoints.forEach((pt, index) => {
-      const fillColor = config.highlightFirstEvent && index === 0 ? firstEventColor : color;
-      drawEventMarker(pt, strokeColor, fillColor, eventRadius, {
-        highlight: !!config.highlightFirstEvent && index === 0,
-      });
-    });
+  } else if (config.segmentCount && config.segmentCount > 1 && config.segmentDuration > 0) {
     const segmentDuration = config.segmentDuration;
     const cycleDuration = segmentDuration * config.segmentCount;
     const local = elapsed % cycleDuration;
     const index = Math.floor(local / segmentDuration);
     const t = (local - index * segmentDuration) / segmentDuration;
-    const current = points[index % points.length];
-    const next = points[(index + 1) % points.length];
-    const point = lerpPoint(current, next, t);
-    drawCircle(point, color);
+    point = lerpPoint(start, end, t);
+  } else {
+    const local =
+      config.segmentDuration > 0
+        ? (elapsed % config.segmentDuration) / config.segmentDuration
+        : 0;
+    point = lerpPoint(start, end, local);
+  }
+  drawCircle(point, shared.color);
+}
+
+function renderPolygonShape(config, elapsed, shared) {
+  const { points } = getPolygonPoints(config.orientation, config.sides);
+  drawPolygon(points);
+
+  const eventPoints = getPolygonSoundPoints(points, config.soundMarkers);
+  renderEventMarkers(eventPoints, {
+    ...shared,
+    highlightFirstEvent: config.highlightFirstEvent,
+  });
+
+  const segmentDuration = config.segmentDuration;
+  const cycleDuration = segmentDuration * config.segmentCount;
+  const local = elapsed % cycleDuration;
+  const index = Math.floor(local / segmentDuration);
+  const t = (local - index * segmentDuration) / segmentDuration;
+  const current = points[index % points.length];
+  const next = points[(index + 1) % points.length];
+  const point = lerpPoint(current, next, t);
+  drawCircle(point, shared.color);
+}
+
+function renderCircleShape(config, elapsed, shared) {
+  const { center, radius, top } = getCircleGeometry(config.orientation);
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  renderEventMarkers([top], {
+    ...shared,
+    highlightFirstEvent: config.highlightFirstEvent,
+  });
+
+  const segmentDuration = config.segmentDuration || 0;
+  let progress = 0;
+  if (segmentDuration > 0) {
+    const local = elapsed % segmentDuration;
+    progress = local / segmentDuration;
+  } else if (config.cycleDuration && config.cycleDuration > 0) {
+    const local = elapsed % config.cycleDuration;
+    progress = local / config.cycleDuration;
+  }
+
+  const angle = -Math.PI / 2 + 2 * Math.PI * progress;
+  const point = {
+    x: center.x + radius * Math.cos(angle),
+    y: center.y + radius * Math.sin(angle),
+  };
+  drawCircle(point, shared.color);
+}
+
+function drawQuadrantShape(name, config, elapsed) {
+  ctx.strokeStyle = getStrokeColor(name);
+  ctx.lineWidth = 3;
+  const shared = {
+    strokeColor: ctx.strokeStyle,
+    color: getSegmentColor(name),
+    firstEventColor: getFirstSoundMarkerColor(name),
+    eventRadius: ctx.lineWidth * 2,
+  };
+
+  if (config.shape === 'line') {
+    renderLineShape(config, elapsed, shared);
+  } else if (config.shape === 'polygon') {
+    renderPolygonShape(config, elapsed, shared);
   } else if (config.shape === 'circle') {
-    const { center, radius, top } = getCircleGeometry(config.orientation);
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    const fillColor = config.highlightFirstEvent ? firstEventColor : color;
-    drawEventMarker(top, strokeColor, fillColor, eventRadius, {
-      highlight: !!config.highlightFirstEvent,
-    });
-
-    const segmentDuration = config.segmentDuration || 0;
-    let progress = 0;
-    if (segmentDuration > 0) {
-      const local = elapsed % segmentDuration;
-      progress = local / segmentDuration;
-    } else if (config.cycleDuration && config.cycleDuration > 0) {
-      const local = elapsed % config.cycleDuration;
-      progress = local / config.cycleDuration;
-    }
-
-    const angle = -Math.PI / 2 + 2 * Math.PI * progress;
-    const point = {
-      x: center.x + radius * Math.cos(angle),
-      y: center.y + radius * Math.sin(angle),
-    };
-    drawCircle(point, color);
+    renderCircleShape(config, elapsed, shared);
   }
 }
 
