@@ -418,18 +418,6 @@ function drawGatiQuadrant3dInternal(config, elapsed) {
     drawCircleShape();
   }
 }
-      baseOpacity: 0.32,
-    });
-  };
-
-  if (view2d.shape === 'line') {
-    drawLineShape();
-  } else if (view2d.shape === 'polygon') {
-    drawPolygonShape();
-  } else if (view2d.shape === 'circle') {
-    drawCircleShape();
-  }
-}
 
 function drawJatiQuadrant3dInternal(config, elapsed) {
   const ctx = ctxRef;
