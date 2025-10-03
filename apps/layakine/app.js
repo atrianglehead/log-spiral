@@ -475,6 +475,37 @@ function measureTabMetrics(entry, bounds, options = {}) {
   };
 }
 
+function computeTabScaleCompression(rect = null) {
+  const viewportHeight =
+    typeof window !== 'undefined' && typeof window.innerHeight === 'number'
+      ? window.innerHeight
+      : rect?.height ?? 0;
+
+  if (!(viewportHeight > 0)) {
+    return 1;
+  }
+
+  const normalizedHeight = Math.min(viewportHeight, 500) / 500;
+  const exponent = 4.5;
+  const compression = normalizedHeight ** exponent;
+  const minCompression = 0.1;
+
+  return clamp(compression, minCompression, 1);
+}
+
+function applyTabScaleCompression(metrics, compression) {
+  if (!metrics || !(compression > 0)) {
+    return metrics;
+  }
+
+  return {
+    ...metrics,
+    scale: metrics.scale * compression,
+    width: metrics.width * compression,
+    height: metrics.height * compression,
+  };
+}
+
 function resetQuadrantTabStyles(tabs) {
   return tabs.map((tab) => {
     tab.style.setProperty('--quadrant-tab-scale', '1');
@@ -558,12 +589,13 @@ function updateQuadrantTabSizing(rect) {
     return;
   }
 
+  const viewportCompression = computeTabScaleCompression(rect);
   const maxTabWidthRatio = 0.85;
   const resetMeasurements = resetQuadrantTabStyles(quadrantTabs);
 
   const metricsByTab = new Map();
   const gatiEntry = resetMeasurements.find(({ tab }) => tab.dataset.quadrant === 'gati');
-  let gatiTargetHeight = null;
+  let gatiTargetHeightRaw = null;
 
   if (gatiEntry) {
     const gatiBounds = geometry.quadrantBounds.gati || geometry.fallbackBounds;
@@ -571,11 +603,12 @@ function updateQuadrantTabSizing(rect) {
       Math.max(0, gatiBounds.right - gatiBounds.left),
       Math.max(0, geometry.quadrantWidth * maxTabWidthRatio),
     );
-    const gatiMetrics = measureTabMetrics(gatiEntry, gatiBounds, {
+    const gatiRawMetrics = measureTabMetrics(gatiEntry, gatiBounds, {
       maxWidth: gatiMaxWidth,
     });
+    const gatiMetrics = applyTabScaleCompression(gatiRawMetrics, viewportCompression);
     metricsByTab.set(gatiEntry.tab, gatiMetrics);
-    gatiTargetHeight = gatiMetrics.height;
+    gatiTargetHeightRaw = gatiRawMetrics.height;
   }
 
   resetMeasurements.forEach((entry) => {
@@ -587,10 +620,11 @@ function updateQuadrantTabSizing(rect) {
       Math.max(0, bounds.right - bounds.left),
       Math.max(0, geometry.quadrantWidth * maxTabWidthRatio),
     );
-    const metrics = measureTabMetrics(entry, bounds, {
-      targetHeight: gatiTargetHeight,
+    const rawMetrics = measureTabMetrics(entry, bounds, {
+      targetHeight: gatiTargetHeightRaw,
       maxWidth,
     });
+    const metrics = applyTabScaleCompression(rawMetrics, viewportCompression);
     metricsByTab.set(entry.tab, metrics);
   });
 
