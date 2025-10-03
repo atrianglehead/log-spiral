@@ -9,7 +9,7 @@ import { buildQuadrantConfigs } from './render/configBuilder.js';
 import { getOffsetsFromQuadrant } from './render/draw2d.js';
 import { drawQuadrant as renderQuadrant } from './render/quadrantRenderer.js';
 
-const canvas = document.getElementById('layakine-canvas');
+const canvas = document.getElementById('pralaya-canvas');
 const ctx = canvas.getContext('2d');
 const playToggle = document.getElementById('play-toggle');
 let quadrantTabs = [];
