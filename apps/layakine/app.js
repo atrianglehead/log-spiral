@@ -133,6 +133,74 @@ const voices = {
   },
 };
 
+function lightenColor(hex, amount = 0.25) {
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) {
+    return hex;
+  }
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  if ([r, g, b].some((component) => Number.isNaN(component))) {
+    return hex;
+  }
+  const mix = (component) => {
+    const value = Math.round(component + (255 - component) * amount);
+    return Math.max(0, Math.min(255, value));
+  };
+  const toHex = (component) => component.toString(16).padStart(2, '0');
+  const lightened = `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
+  return lightened;
+}
+
+const defaultVoicePalette = {
+  base: '#f4f4f4',
+  stroke: '#404040',
+  highlight: '#f4f4f4',
+};
+
+const voicePalette = {
+  laya: {
+    base: '#f4a261',
+    stroke: '#3a3a3a',
+    highlight: '#f4a261',
+  },
+  gati: {
+    base: '#2a9d8f',
+    stroke: '#264653',
+    highlight: lightenColor('#2a9d8f', 0.4),
+  },
+  jati: {
+    base: '#e76f51',
+    stroke: '#5d2a2c',
+    highlight: '#e76f51',
+  },
+  nadai: {
+    base: '#9c6ade',
+    stroke: '#3c2f57',
+    highlight: lightenColor('#9c6ade', 0.38),
+  },
+};
+
+function getVoicePaletteEntry(name) {
+  return voicePalette[name] ?? defaultVoicePalette;
+}
+
+function getSegmentColor(name) {
+  const { base } = getVoicePaletteEntry(name);
+  return base ?? defaultVoicePalette.base;
+}
+
+function getFirstSoundMarkerColor(name) {
+  const { highlight, base } = getVoicePaletteEntry(name);
+  return highlight ?? base ?? defaultVoicePalette.highlight;
+}
+
+function getStrokeColor(name) {
+  const { stroke } = getVoicePaletteEntry(name);
+  return stroke ?? defaultVoicePalette.stroke;
+}
+
 function ensureAudio() {
   if (!audioCtx) {
     audioCtx = new AudioContext();
@@ -721,73 +789,12 @@ function getPolygonSoundPoints(points, soundMarkers) {
   return points;
 }
 
-function getSegmentColor(name) {
-  switch (name) {
-    case 'laya':
-      return '#f4a261';
-    case 'gati':
-      return '#2a9d8f';
-    case 'jati':
-      return '#e76f51';
-    case 'nadai':
-      return '#9c6ade';
-    default:
-      return '#f4f4f4';
-  }
-}
-
-function lightenColor(hex, amount = 0.25) {
-  const normalized = hex.replace('#', '');
-  if (normalized.length !== 6) {
-    return hex;
-  }
-  const r = parseInt(normalized.slice(0, 2), 16);
-  const g = parseInt(normalized.slice(2, 4), 16);
-  const b = parseInt(normalized.slice(4, 6), 16);
-  if ([r, g, b].some((component) => Number.isNaN(component))) {
-    return hex;
-  }
-  const mix = (component) => {
-    const value = Math.round(component + (255 - component) * amount);
-    return Math.max(0, Math.min(255, value));
-  };
-  const toHex = (component) => component.toString(16).padStart(2, '0');
-  const lightened = `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
-  return lightened;
-}
-
-function getFirstSoundMarkerColor(name, baseColor) {
-  switch (name) {
-    case 'gati':
-      return lightenColor(baseColor, 0.4);
-    case 'nadai':
-      return lightenColor(baseColor, 0.38);
-    default:
-      return baseColor;
-  }
-}
-
-function getStrokeColor(name) {
-  switch (name) {
-    case 'laya':
-      return '#3a3a3a';
-    case 'gati':
-      return '#264653';
-    case 'jati':
-      return '#5d2a2c';
-    case 'nadai':
-      return '#3c2f57';
-    default:
-      return '#404040';
-  }
-}
-
 function drawQuadrantShape(name, config, elapsed) {
   ctx.strokeStyle = getStrokeColor(name);
   ctx.lineWidth = 3;
   const strokeColor = ctx.strokeStyle;
   const color = getSegmentColor(name);
-  const firstEventColor = getFirstSoundMarkerColor(name, color);
+  const firstEventColor = getFirstSoundMarkerColor(name);
   const eventRadius = ctx.lineWidth * 2;
   if (config.shape === 'line') {
     const [start, end] = getLinePoints(config.orientation);
