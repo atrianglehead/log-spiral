@@ -12,6 +12,10 @@
       --accent: #f4a261;
       --line: #202020;
       --text-muted: #9d9d9d;
+      --quadrant-tab-height: 50px;
+      --quadrant-tab-width: 50px;
+      --quadrant-tab-spacing: 20px;
+      --quadrant-midpoint: 50%;
       font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     html, body {
@@ -167,6 +171,34 @@
       justify-content: center;
       padding: 16px;
     }
+    .quadrant-control {
+      position: absolute;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .quadrant-control > * {
+      pointer-events: auto;
+    }
+    .quadrant-control.top-middle-left {
+      top: 8px;
+      left: 25%;
+      transform: translateX(-50%);
+    }
+    .quadrant-control.top-middle-right {
+      top: 8px;
+      left: 75%;
+      transform: translateX(-50%);
+    }
+    .quadrant-control.bottom-middle-left {
+      bottom: 8px;
+      left: 25%;
+      transform: translateX(-50%);
+    }
+    .quadrant-control.bottom-middle-right {
+      bottom: 8px;
+      left: 75%;
+      transform: translateX(-50%);
+    }
     .quadrant-tabs {
       position: absolute;
       display: flex;
@@ -177,10 +209,30 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 10px;
       padding: 4px;
-      z-index: 3;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
       backdrop-filter: blur(6px);
-      height: var(--quadrant-tab-height, 40px);
+      z-index: 3;
+    }
+    .quadrant-tabs.gati-toggle {
+        top: calc(var(--quadrant-midpoint)/2 - var(--quadrant-tab-height));
+        left: var(--quadrant-tab-spacing);
+        /*transform: translateY(-50%);*/
+        flex-direction: column;
+    }
+    .quadrant-tabs.jati-toggle {
+        top: calc(var(--quadrant-midpoint)/2 - var(--quadrant-tab-height));
+        right: var(--quadrant-tab-spacing);
+        flex-direction: column;
+    }
+    .quadrant-tabs.laya-toggle {
+        bottom: calc(var(--quadrant-midpoint)/2 - var(--quadrant-tab-height));
+        left: var(--quadrant-tab-spacing);
+        flex-direction: column;
+    }
+    .quadrant-tabs.nadai-toggle {
+        bottom: calc(var(--quadrant-midpoint)/2 - var(--quadrant-tab-height));
+        right: var(--quadrant-tab-spacing);
+        flex-direction: column;
     }
     .quadrant-option {
       position: absolute;
@@ -225,8 +277,6 @@
       cursor: pointer;
       transition: color 0.2s ease, background 0.2s ease;
       flex: 0 0 auto;
-      width: var(--quadrant-tab-width, 80px);
-      height: 100%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -239,30 +289,34 @@
       outline: 2px solid var(--accent);
       outline-offset: 2px;
     }
-    .quadrant-tabs.top-left {
-      top: 0;
-      left: 0;
+    .quadrant-control .control {
+      background: rgba(8, 8, 8, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 16px;
+      gap: 12px;
+      min-width: 260px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+      display: flex;
+      align-items: center;
     }
-    .quadrant-tabs.top-right {
-      top: 0;
-      right: 0;
-      left: auto;
-      justify-content: flex-end;
+    .quadrant-control .control label {
+      font-size: 0.7rem;
+      min-width: 32px;
     }
-    .quadrant-option.top-right {
-      top: calc(var(--quadrant-tab-height, 40px) + 32px);
-      right: 0;
-      left: auto;
+    .quadrant-control .control input[type="range"] {
+      flex: 1;
+      min-width: 80px;
     }
-    .quadrant-tabs.bottom-left {
-      top: 50%;
-      left: 0;
+    .quadrant-control .control .value {
+      font-size: 0.7rem;
+      min-width: 32px;
     }
-    .quadrant-tabs.bottom-right {
-      top: 50%;
-      right: 0;
-      left: auto;
-      justify-content: flex-end;
+    .quadrant-control .control .mute {
+      font-size: 0.6rem;
+      padding: 4px 8px;
+      min-width: 48px;
     }
     canvas {
       width: 100%;
@@ -384,18 +438,50 @@
         padding: 12px;
         min-height: 50vh;
       }
+      .quadrant-control .control {
+        min-width: 0;
+        max-width: 35vw;
+        padding: 4px 6px;
+        gap: 4px;
+      }
+      .quadrant-control .control label {
+        font-size: 0.6rem;
+        min-width: 24px;
+      }
+      .quadrant-control .control input[type="range"] {
+        flex: 1;
+        min-width: 50px;
+      }
+      .quadrant-control .control .value {
+        font-size: 0.6rem;
+        min-width: 24px;
+      }
+      .quadrant-control .control .mute {
+        font-size: 0.5rem;
+        padding: 4px;
+        min-width: 0;
+        flex-shrink: 1;
+        width: 24px;
+        height: 24px;
+      }
+      .quadrant-control .control .mute .mute-label {
+        display: none;
+      }
+      .quadrant-control .control .mute::before {
+        content: "🔊";
+        font-size: 0.9rem;
+      }
+      .quadrant-control .control .mute.active::before {
+        content: "🔇";
+      }
       .quadrant-tabs {
         gap: 3px;
         padding: 3px;
+        margin-bottom: 6px;
       }
       .quadrant-tabs button {
         font-size: clamp(0.52rem, 0.48rem + 0.36vw, 0.78rem);
         border-radius: 4px;
-      }
-      .quadrant-option.top-right {
-        top: calc(var(--quadrant-tab-height, 40px) + 24px);
-        right: 0;
-        left: auto;
       }
     }
   </style>
@@ -403,35 +489,61 @@
 <body>
   <main>
     <h1>Pralaya</h1>
-    <section class="control-strip" aria-label="Gati and Jati controls">
-      <div class="control" data-kind="gati">
-        <label for="gati">Gati</label>
-        <input id="gati" type="range" min="1" max="13" step="1" value="4" />
-        <span class="value" data-for="gati">4</span>
-        <button class="mute" data-target="gati" aria-pressed="false" aria-label="Toggle gati mute">
-          <span class="mute-label">Mute</span>
-        </button>
-      </div>
-      <div class="control" data-kind="jati">
-        <label for="jati">Jati</label>
-        <input id="jati" type="range" min="1" max="13" step="1" value="3" />
-        <span class="value" data-for="jati">3</span>
-        <button class="mute" data-target="jati" aria-pressed="false" aria-label="Toggle jati mute">
-          <span class="mute-label">Mute</span>
-        </button>
-      </div>
-    </section>
     <div class="canvas-wrapper">
-      <div class="quadrant-tabs top-left" data-quadrant="gati">
+      <div class="quadrant-control top-middle-left" data-quadrant="gati">
+        <div class="control" data-kind="gati">
+          <label for="gati">Gati</label>
+          <input id="gati" type="range" min="1" max="13" step="1" value="4" />
+          <span class="value" data-for="gati">4</span>
+          <button class="mute" data-target="gati" aria-pressed="false" aria-label="Toggle gati mute">
+            <span class="mute-label">Mute</span>
+          </button>
+        </div>
+      </div>
+      <div class="quadrant-tabs gati-toggle" data-quadrant="gati">
         <button class="mode-tab" data-quadrant="gati" data-mode="1d" type="button">1D</button>
         <button class="mode-tab" data-quadrant="gati" data-mode="2d" type="button">2D</button>
       </div>
-      <div class="quadrant-tabs top-right" data-quadrant="jati">
+      <div class="quadrant-control top-middle-right" data-quadrant="jati">
+        <div class="control" data-kind="jati">
+          <label for="jati">Jati</label>
+          <input id="jati" type="range" min="1" max="13" step="1" value="3" />
+          <span class="value" data-for="jati">3</span>
+          <button class="mute" data-target="jati" aria-pressed="false" aria-label="Toggle jati mute">
+            <span class="mute-label">Mute</span>
+          </button>
+        </div>
+      </div>
+      <div class="quadrant-tabs jati-toggle" data-quadrant="jati">
         <button class="mode-tab" data-quadrant="jati" data-mode="1d" type="button">1D</button>
         <button class="mode-tab" data-quadrant="jati" data-mode="2d" type="button">2D</button>
         <button class="mode-tab" data-quadrant="jati" data-mode="3d" type="button">3D</button>
       </div>
-      <div class="quadrant-tabs bottom-right" data-quadrant="nadai">
+      <div class="quadrant-control bottom-middle-left" data-quadrant="laya">
+        <div class="control" data-kind="laya">
+          <label for="laya">Laya</label>
+          <input id="laya" type="range" min="30" max="120" step="1" value="40" />
+          <span class="value" data-for="laya">40 bpm</span>
+          <button class="mute" data-target="laya" aria-pressed="false" aria-label="Toggle laya mute">
+            <span class="mute-label">Mute</span>
+          </button>
+        </div>
+      </div>
+      <div class="quadrant-tabs laya-toggle" data-quadrant="laya">
+        <button class="mode-tab" data-quadrant="laya" data-mode="1d" type="button">1D</button>
+        <button class="mode-tab" data-quadrant="laya" data-mode="2d" type="button">2D</button>
+      </div>
+      <div class="quadrant-control bottom-middle-right" data-quadrant="nadai">
+        <div class="control" data-kind="nadai">
+          <label for="nadai">Nadai</label>
+          <input id="nadai" type="range" min="1" max="13" step="1" value="1" />
+          <span class="value" data-for="nadai">1</span>
+          <button class="mute" data-target="nadai" aria-pressed="false" aria-label="Toggle nadai mute">
+            <span class="mute-label">Mute</span>
+          </button>
+        </div>
+      </div>
+      <div class="quadrant-tabs nadai-toggle" data-quadrant="nadai">
         <button class="mode-tab" data-quadrant="nadai" data-mode="1d" type="button">1D</button>
         <button class="mode-tab" data-quadrant="nadai" data-mode="2d" type="button">2D</button>
         <button class="mode-tab" data-quadrant="nadai" data-mode="3d" type="button">3D</button>
@@ -441,24 +553,6 @@
         <span class="play-toggle-icon" aria-hidden="true"></span>
       </button>
     </div>
-    <section class="control-strip" aria-label="Laya and Nadai controls">
-      <div class="control" data-kind="laya">
-        <label for="laya">Laya</label>
-        <input id="laya" type="range" min="30" max="120" step="1" value="40" />
-        <span class="value" data-for="laya">40 bpm</span>
-        <button class="mute" data-target="laya" aria-pressed="false" aria-label="Toggle laya mute">
-          <span class="mute-label">Mute</span>
-        </button>
-      </div>
-      <div class="control" data-kind="nadai">
-        <label for="nadai">Nadai</label>
-        <input id="nadai" type="range" min="1" max="13" step="1" value="1" />
-        <span class="value" data-for="nadai">1</span>
-        <button class="mute" data-target="nadai" aria-pressed="false" aria-label="Toggle nadai mute">
-          <span class="mute-label">Mute</span>
-        </button>
-      </div>
-    </section>
   </main>
   <script type="module" src="./app.js"></script>
 </body>
