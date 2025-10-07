@@ -122,7 +122,7 @@ function updateQuadrantTabSizing(rect) {
     tabContainer.style.setProperty('--quadrant-tab-height', `${tabHeight}px`);
     const buttons = tabContainer.querySelectorAll('.mode-tab');
     buttons.forEach((button) => {
-      button.style.width = `${tabWidth}px`;
+      button.style.width = `${tabWidth/3}px`;
       button.style.height = `${tabHeight}px`;
     });
   });
@@ -230,10 +230,6 @@ function render() {
     });
   });
 
-  drawQuadrantLabel('laya', 'bottom-left');
-  drawQuadrantLabel('gati', 'top-left');
-  drawQuadrantLabel('jati', 'top-right');
-  drawQuadrantLabel('nadai', 'bottom-right');
 
   if (muteState.laya) {
     drawMuteOverlay('bottom-left');
